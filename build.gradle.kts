@@ -38,10 +38,12 @@ neoForge {
         create("client") {
             client()
             systemProperty("java.awt.headless", "false")
+            logLevel = org.slf4j.event.Level.DEBUG
         }
 
         create("server") {
             server()
+            logLevel = org.slf4j.event.Level.DEBUG
         }
 
         create("data") {
@@ -57,18 +59,22 @@ neoForge {
 }
 
 val flatLafDependency = "com.formdev:flatlaf:3.7.2"
+val flatLafExtrasDependency = "com.formdev:flatlaf-extras:3.7.2"
 val migLayoutDependency = "com.miglayout:miglayout-swing:11.4.3"
 
 dependencies {
     implementation(flatLafDependency)
+    implementation(flatLafExtrasDependency)
     implementation(migLayoutDependency)
 
     // NeoForge 1.21.1 needs non-Minecraft libraries on the development run classpath.
     add("additionalRuntimeClasspath", flatLafDependency)
+    add("additionalRuntimeClasspath", flatLafExtrasDependency)
     add("additionalRuntimeClasspath", migLayoutDependency)
 
     // Include the libraries in the built mod for production use.
     jarJar(flatLafDependency)
+    jarJar(flatLafExtrasDependency)
     jarJar(migLayoutDependency)
 }
 
