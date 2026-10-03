@@ -52,7 +52,7 @@ class ClientStartupCoordinatorTest {
             {
               "neverAskForOptionals": false,
               "skipForOptionalModUrl": {
-                "https://example.com/optional-client-mod.jar": true
+                "https://modrinth.com/optional-client-mod.jar": true
               }
             }
             """);
@@ -68,7 +68,7 @@ class ClientStartupCoordinatorTest {
     }
 
     private static DownloadableModConfiguration mod(String filePattern, String name) {
-        return new DownloadableModConfiguration("https://example.com/" + name.toLowerCase().replace(' ', '-') + ".jar", filePattern, name, true);
+        return new DownloadableModConfiguration("https://modrinth.com/" + name.toLowerCase().replace(' ', '-') + ".jar", filePattern, name, true);
     }
 
     private static ConfigurationJsonRoot configuration(DownloadableModConfiguration mod) {

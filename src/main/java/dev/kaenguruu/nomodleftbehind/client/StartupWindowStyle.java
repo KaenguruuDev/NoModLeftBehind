@@ -95,6 +95,17 @@ final class StartupWindowStyle {
         return intro;
     }
 
+    public static JLabel createSecurityWarning() {
+        var warning = createLabel(
+            "Only download files when you trust the modpack author and linked source.",
+            SMALL_FONT,
+            OPTIONAL_COLOR
+        );
+        setFixedHeight(warning, 18);
+
+        return warning;
+    }
+
     public static JPanel createSummarySlot(JLabel summary) {
         var summarySlot = new JPanel(new BorderLayout());
         summarySlot.setOpaque(false);

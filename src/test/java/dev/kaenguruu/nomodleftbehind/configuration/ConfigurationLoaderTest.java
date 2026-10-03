@@ -29,8 +29,10 @@ class ConfigurationLoaderTest {
         assertNotNull(configuration);
         assertNotNull(configuration.clientMods());
         assertNotNull(configuration.serverMods());
+        assertNotNull(configuration.trustedDomains());
         assertTrue(configuration.clientMods().isEmpty());
         assertTrue(configuration.serverMods().isEmpty());
+        assertTrue(configuration.trustedDomains().isEmpty());
 
         var configFile = gameDirectory.resolve("config/nomodsleftbehind/nomodleftbehind.json");
         assertTrue(Files.isRegularFile(configFile));
@@ -65,6 +67,7 @@ class ConfigurationLoaderTest {
         assertEquals("Client Mod", clientMod.name());
         assertTrue(clientMod.isOptional());
         assertTrue(configuration.serverMods().isEmpty());
+        assertTrue(configuration.trustedDomains().isEmpty());
     }
 
     @Test

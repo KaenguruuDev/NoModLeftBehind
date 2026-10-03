@@ -52,7 +52,7 @@ class ServerStartupCoordinatorTest {
 
     private static DownloadableModConfiguration mod(String filePattern, String name, boolean optional) {
         return new DownloadableModConfiguration(
-            "https://example.com/" + name.toLowerCase().replace(' ', '-') + ".jar",
+            "https://modrinth.com/" + name.toLowerCase().replace(' ', '-') + ".jar",
             filePattern,
             name,
             optional

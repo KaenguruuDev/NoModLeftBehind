@@ -65,7 +65,6 @@ public final class StartupWindow {
                 sortedMissingMods,
                 requiredCount,
                 optionalCount,
-                decisionHandler,
                 dontShowAgainHandler,
                 neverAskForOptionals,
                 optionalPreferenceHandler
@@ -106,7 +105,6 @@ public final class StartupWindow {
         List<DownloadableModConfiguration> sortedMissingMods,
         int requiredCount,
         int optionalCount,
-        Consumer<StartupDecision> decisionHandler,
         Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
         boolean neverAskForOptionals,
         Function<Boolean, Boolean> optionalPreferenceHandler
@@ -115,7 +113,6 @@ public final class StartupWindow {
             sortedMissingMods,
             requiredCount,
             optionalCount,
-            decisionHandler,
             dontShowAgainHandler,
             neverAskForOptionals,
             optionalPreferenceHandler
@@ -131,7 +128,6 @@ public final class StartupWindow {
         List<DownloadableModConfiguration> sortedMissingMods,
         int requiredCount,
         int optionalCount,
-        Consumer<StartupDecision> decisionHandler,
         Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
         boolean neverAskForOptionals,
         Function<Boolean, Boolean> optionalPreferenceHandler
@@ -139,6 +135,7 @@ public final class StartupWindow {
         var content = StartupWindowStyle.createContent();
         content.add(StartupWindowStyle.createHeading());
         content.add(StartupWindowStyle.createIntro());
+        content.add(StartupWindowStyle.createSecurityWarning());
 
         var summary = StartupWindowStyle.createLabel(
             summaryText(requiredCount, optionalCount),
@@ -152,7 +149,6 @@ public final class StartupWindow {
             requiredCount,
             optionalCount,
             summary,
-            decisionHandler,
             dontShowAgainHandler
         ));
 
@@ -161,7 +157,7 @@ public final class StartupWindow {
             optionalPreferenceHandler
         );
         content.add(StartupWindowStyle.createPreferenceSlot(optionalPreference));
-        content.add(createFooter(sortedMissingMods, decisionHandler));
+        content.add(createFooter(sortedMissingMods));
 
         return content;
     }
@@ -171,13 +167,12 @@ public final class StartupWindow {
         int requiredCount,
         int optionalCount,
         javax.swing.JLabel summary,
-        Consumer<StartupDecision> decisionHandler,
         Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler
     ) {
         var modList = StartupWindowStyle.createModList();
         var modListState = new ModListState(modList, summary, requiredCount, optionalCount);
         for (var mod : sortedMissingMods) {
-            var row = createModRow(mod, dontShowAgainHandler, decisionHandler, () -> modListState.remove(mod));
+            var row = createModRow(mod, dontShowAgainHandler, () -> modListState.remove(mod));
             modListState.add(mod, row);
         }
 
@@ -186,8 +181,7 @@ public final class StartupWindow {
     }
 
     private JPanel createFooter(
-        List<DownloadableModConfiguration> sortedMissingMods,
-        Consumer<StartupDecision> decisionHandler
+        List<DownloadableModConfiguration> sortedMissingMods
     ) {
         var footer = StartupWindowStyle.createFooter();
 
@@ -197,9 +191,7 @@ public final class StartupWindow {
 
         var downloadAll = StartupWindowStyle.createButton("Download all", true);
         StartupWindowStyle.setFixedHeight(downloadAll, 34);
-        downloadAll.addActionListener(event -> {
-            sortedMissingMods.forEach(mod -> openUrl(mod.url()));
-        });
+        downloadAll.addActionListener(event -> sortedMissingMods.forEach(mod -> openUrl(mod.url())));
 
         footer.add(openModsDirectory, "left, top");
         footer.add(downloadAll, "right, top");
@@ -210,7 +202,6 @@ public final class StartupWindow {
     private JPanel createModRow(
         DownloadableModConfiguration mod,
         Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
-        Consumer<StartupDecision> decisionHandler,
         Runnable removeRow
     ) {
         var row = StartupWindowStyle.createModRow();
@@ -224,7 +215,7 @@ public final class StartupWindow {
             StartupWindowStyle.statusConstraints()
         );
 
-        addDownloadButton(row, mod, decisionHandler);
+        addDownloadButton(row, mod);
         addOptionalAction(row, mod, optional, dontShowAgainHandler, removeRow);
 
         return row;
@@ -232,15 +223,12 @@ public final class StartupWindow {
 
     private void addDownloadButton(
         JPanel row,
-        DownloadableModConfiguration mod,
-        Consumer<StartupDecision> decisionHandler
+        DownloadableModConfiguration mod
     ) {
         var download = StartupWindowStyle.createButton("Download", false);
         StartupWindowStyle.setFixedWidth(download, 88);
         StartupWindowStyle.setFixedHeight(download, 34);
-        download.addActionListener(event -> {
-            openUrl(mod.url());
-        });
+        download.addActionListener(event -> openUrl(mod.url()));
 
         row.add(download, StartupWindowStyle.actionConstraints(2, 12));
     }

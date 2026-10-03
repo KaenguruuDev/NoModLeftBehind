@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ConfigurationValidatorTest {
     @Test
     void rejectsNullConfiguration() {
-        var issues = ConfigurationValidator.validate(null);
+        var issues = validate(null);
 
         assertEquals(1, issues.size());
         assertIssue(issues.getFirst(), "configuration", ConfigurationError.NULL_CONFIGURATION);
@@ -24,7 +24,7 @@ class ConfigurationValidatorTest {
         nullEntryList.add(null);
         var configuration = new ConfigurationJsonRoot(null, nullEntryList);
 
-        var issues = ConfigurationValidator.validate(configuration);
+        var issues = validate(configuration);
 
         assertEquals(2, issues.size());
         assertIssue(issues.get(0), "clientMods", ConfigurationError.NULL_MOD_LIST);
@@ -35,7 +35,7 @@ class ConfigurationValidatorTest {
     void rejectsMissingRequiredModFields() {
         var mod = new DownloadableModConfiguration("", null, "  ", false);
 
-        var issues = ConfigurationValidator.validate(new ConfigurationJsonRoot(List.of(mod), List.of()));
+        var issues = validate(new ConfigurationJsonRoot(List.of(mod), List.of()));
 
         assertEquals(3, issues.size());
         assertIssue(issues.get(0), "clientMods[0].name", ConfigurationError.MISSING_NAME);
@@ -53,7 +53,7 @@ class ConfigurationValidatorTest {
             mod("not a uri", "malformed")
         );
 
-        var issues = ConfigurationValidator.validate(new ConfigurationJsonRoot(mods, List.of()));
+        var issues = validate(new ConfigurationJsonRoot(mods, List.of()));
 
         assertEquals(5, issues.size());
         assertIssue(issues.get(0), "clientMods[0].url", ConfigurationError.INVALID_URL);
@@ -64,10 +64,85 @@ class ConfigurationValidatorTest {
     }
 
     @Test
-    void rejectsInvalidRegex() {
-        var mod = mod("https://example.com/mod.jar", "[");
+    void rejectsUrlsOutsideApprovedModSources() {
+        var mod = mod("https://example.com/mod.jar", "example");
 
-        var issues = ConfigurationValidator.validate(new ConfigurationJsonRoot(List.of(mod), List.of()));
+        var issues = validate(new ConfigurationJsonRoot(List.of(mod), List.of()));
+
+        assertEquals(1, issues.size());
+        assertIssue(issues.getFirst(), "clientMods[0].url", ConfigurationError.INVALID_URL);
+    }
+
+    @Test
+    void acceptsApprovedModSourcesAndSubdomains() {
+        var mods = List.of(
+            mod("https://modrinth.com/mod.jar", "modrinth"),
+            mod("https://cdn.modrinth.com/mod.jar", "modrinth-subdomain"),
+            mod("https://curseforge.com/mod.jar", "curseforge"),
+            mod("https://cdn.curseforge.com/mod.jar", "curseforge-subdomain"),
+            mod("https://forgecdn.net/mod.jar", "forgecdn"),
+            mod("https://cdn.forgecdn.net/mod.jar", "forgecdn-subdomain"),
+            mod("https://github.com/mod.jar", "github"),
+            mod("https://raw.github.com/mod.jar", "github-subdomain"),
+            mod("https://githubusercontent.com/mod.jar", "githubusercontent"),
+            mod("https://raw.githubusercontent.com/mod.jar", "githubusercontent-subdomain")
+        );
+
+        var issues = validate(new ConfigurationJsonRoot(mods, List.of()));
+
+        assertTrue(issues.isEmpty());
+    }
+
+    @Test
+    void acceptsConfiguredTrustedDomainsAndTheirSubdomains() {
+        var mod = mod("https://downloads.example.com/mod.jar", "example");
+        var configuration = new ConfigurationJsonRoot(
+            List.of(mod),
+            List.of(),
+            List.of("example.com")
+        );
+
+        var issues = validate(configuration);
+
+        assertTrue(issues.isEmpty());
+    }
+
+    @Test
+    void rejectsInvalidTrustedDomains() {
+        var configuration = new ConfigurationJsonRoot(
+            List.of(),
+            List.of(),
+            List.of("https://example.com", "*.example.com", "192.0.2.1", "com")
+        );
+
+        var issues = validate(configuration);
+
+        assertEquals(4, issues.size());
+        assertIssue(issues.get(0), "trustedDomains[0]", ConfigurationError.INVALID_TRUSTED_DOMAIN);
+        assertIssue(issues.get(1), "trustedDomains[1]", ConfigurationError.INVALID_TRUSTED_DOMAIN);
+        assertIssue(issues.get(2), "trustedDomains[2]", ConfigurationError.INVALID_TRUSTED_DOMAIN);
+        assertIssue(issues.get(3), "trustedDomains[3]", ConfigurationError.INVALID_TRUSTED_DOMAIN);
+    }
+
+    @Test
+    void rejectsOverlongTrustedDomainsWithoutRegexBacktracking() {
+        var configuration = new ConfigurationJsonRoot(
+            List.of(),
+            List.of(),
+            List.of("a".repeat(100_000))
+        );
+
+        var issues = validate(configuration);
+
+        assertEquals(1, issues.size());
+        assertIssue(issues.getFirst(), "trustedDomains[0]", ConfigurationError.INVALID_TRUSTED_DOMAIN);
+    }
+
+    @Test
+    void rejectsInvalidRegex() {
+        var mod = mod("https://modrinth.com/mod.jar", "[");
+
+        var issues = validate(new ConfigurationJsonRoot(List.of(mod), List.of()));
 
         assertEquals(1, issues.size());
         assertIssue(issues.getFirst(), "clientMods[0].filePattern", ConfigurationError.INVALID_REGEX);
@@ -75,10 +150,10 @@ class ConfigurationValidatorTest {
 
     @Test
     void rejectsDuplicateUrlsWithinClientModList() {
-        var first = mod("https://example.com/mod.jar", "first");
-        var second = mod("https://example.com/mod.jar", "second");
+        var first = mod("https://modrinth.com/mod.jar", "first");
+        var second = mod("https://modrinth.com/mod.jar", "second");
 
-        var issues = ConfigurationValidator.validate(new ConfigurationJsonRoot(List.of(first, second), List.of()));
+        var issues = validate(new ConfigurationJsonRoot(List.of(first, second), List.of()));
 
         assertEquals(1, issues.size());
         assertIssue(issues.getFirst(), "clientMods[1].url", ConfigurationError.DUPLICATE_URL);
@@ -86,10 +161,10 @@ class ConfigurationValidatorTest {
 
     @Test
     void rejectsDuplicateUrlsWithinServerModList() {
-        var first = mod("https://example.com/mod.jar", "first");
-        var second = mod("https://example.com/mod.jar", "second");
+        var first = mod("https://modrinth.com/mod.jar", "first");
+        var second = mod("https://modrinth.com/mod.jar", "second");
 
-        var issues = ConfigurationValidator.validate(new ConfigurationJsonRoot(List.of(), List.of(first, second)));
+        var issues = validate(new ConfigurationJsonRoot(List.of(), List.of(first, second)));
 
         assertEquals(1, issues.size());
         assertIssue(issues.getFirst(), "serverMods[1].url", ConfigurationError.DUPLICATE_URL);
@@ -97,19 +172,19 @@ class ConfigurationValidatorTest {
 
     @Test
     void allowsTheSameUrlInClientAndServerModLists() {
-        var clientMod = mod("https://example.com/mod.jar", "client");
-        var serverMod = mod("https://example.com/mod.jar", "server");
+        var clientMod = mod("https://modrinth.com/mod.jar", "client");
+        var serverMod = mod("https://modrinth.com/mod.jar", "server");
 
-        var issues = ConfigurationValidator.validate(new ConfigurationJsonRoot(List.of(clientMod), List.of(serverMod)));
+        var issues = validate(new ConfigurationJsonRoot(List.of(clientMod), List.of(serverMod)));
 
         assertTrue(issues.isEmpty());
     }
 
     @Test
     void acceptsValidConfigurationAndCachesRegexPatterns() {
-        var mod = mod("https://downloads.example.com/mod.jar", "example-mod-[0-9]+\\.jar");
+        var mod = mod("https://downloads.modrinth.com/mod.jar", "example-mod-[0-9]+\\.jar");
 
-        var issues = ConfigurationValidator.validate(new ConfigurationJsonRoot(List.of(mod), List.of(mod)));
+        var issues = validate(new ConfigurationJsonRoot(List.of(mod), List.of(mod)));
 
         assertTrue(issues.isEmpty());
         assertFalse(ConfigurationValidator.getCachedRegexPatterns().isEmpty());
@@ -118,6 +193,10 @@ class ConfigurationValidatorTest {
 
     private static DownloadableModConfiguration mod(String url, String filePattern) {
         return new DownloadableModConfiguration(url, filePattern, "Test Mod", false);
+    }
+
+    private static List<ConfigurationIssue> validate(ConfigurationJsonRoot configuration) {
+        return ConfigurationValidator.validate(configuration);
     }
 
     private static void assertIssue(ConfigurationIssue issue, String path, ConfigurationError error) {

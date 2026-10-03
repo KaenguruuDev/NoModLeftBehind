@@ -48,7 +48,7 @@ class MissingModsResolverTest {
     void returnsAllModsWhenTheModsDirectoryHasNoFiles() throws IOException {
         var required = mod("required-.*\\.jar", "Required Mod");
         var optional = new DownloadableModConfiguration(
-            "https://example.com/optional.jar",
+            "https://modrinth.com/optional.jar",
             "optional-.*\\.jar",
             "Optional Mod",
             true
@@ -63,7 +63,7 @@ class MissingModsResolverTest {
 
     private static DownloadableModConfiguration mod(String filePattern, String name) {
         return new DownloadableModConfiguration(
-            "https://example.com/" + name.toLowerCase().replace(' ', '-') + ".jar",
+            "https://modrinth.com/" + name.toLowerCase().replace(' ', '-') + ".jar",
             filePattern,
             name,
             false

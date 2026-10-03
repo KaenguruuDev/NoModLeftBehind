@@ -7,6 +7,7 @@ public enum ConfigurationError {
     MISSING_NAME,
     MISSING_URL,
     INVALID_URL,
+    INVALID_TRUSTED_DOMAIN,
     DUPLICATE_URL,
     MISSING_FILE_PATTERN,
     INVALID_REGEX
