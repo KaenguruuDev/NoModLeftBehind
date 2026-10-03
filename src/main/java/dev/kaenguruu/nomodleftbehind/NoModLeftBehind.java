@@ -7,17 +7,19 @@ import dev.kaenguruu.nomodleftbehind.startup.ClientStartupCoordinator;
 import dev.kaenguruu.nomodleftbehind.startup.ServerStartupCoordinator;
 import dev.kaenguruu.nomodleftbehind.startup.StartupDecision;
 import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.common.Mod;
 import org.slf4j.Logger;
 
-@Mod(NoModLeftBehind.MOD_ID)
 public final class NoModLeftBehind {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     public static final String MOD_ID = "nomodleftbehind";
     private static final int STARTUP_ABORT_EXIT_CODE = 1;
 
-    public NoModLeftBehind(Dist dist) {
+    private NoModLeftBehind() {
+        /* Utility class */
+    }
+
+    public static void start(Dist dist) {
         if (dist == Dist.CLIENT) {
             // Configure AWT before any client UI class can initialize ImageIcon and cache headless mode.
             System.setProperty("java.awt.headless", "false");

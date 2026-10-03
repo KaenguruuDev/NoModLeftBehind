@@ -61,11 +61,13 @@ neoForge {
 val flatLafDependency = "com.formdev:flatlaf:3.7.2"
 val flatLafExtrasDependency = "com.formdev:flatlaf-extras:3.7.2"
 val migLayoutDependency = "com.miglayout:miglayout-swing:11.4.3"
+val gsonDependency = "com.google.code.gson:gson:2.10.1"
 
 dependencies {
     implementation(flatLafDependency)
     implementation(flatLafExtrasDependency)
     implementation(migLayoutDependency)
+    implementation(gsonDependency)
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
@@ -75,11 +77,25 @@ dependencies {
     add("additionalRuntimeClasspath", flatLafDependency)
     add("additionalRuntimeClasspath", flatLafExtrasDependency)
     add("additionalRuntimeClasspath", migLayoutDependency)
+    add("additionalRuntimeClasspath", gsonDependency)
+}
 
-    // Include the libraries in the built mod for production use.
-    jarJar(flatLafDependency)
-    jarJar(flatLafExtrasDependency)
-    jarJar(migLayoutDependency)
+// This artifact is discovered as a NeoForge early service. Its service layer cannot resolve
+// ordinary Jar-in-Jar libraries yet, so the libraries used by the startup UI must be available
+// directly from the service JAR.
+val earlyServiceDependencies = configurations.create("earlyServiceDependencies") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    extendsFrom(configurations.implementation.get())
+}
+
+tasks.jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from(earlyServiceDependencies.files.map { dependency -> zipTree(dependency) }) {
+        exclude("META-INF/services/**")
+        exclude("META-INF/*.SF", "META-INF/*.RSA", "META-INF/*.DSA")
+        exclude("module-info.class")
+    }
 }
 
 tasks.test {
@@ -88,25 +104,4 @@ tasks.test {
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
-}
-
-tasks.processResources {
-    val metadataProperties = mapOf(
-        "license" to project.property("mod.license"),
-        "github" to project.property("mod.github"),
-        "name" to project.property("mod.name"),
-        "id" to project.property("mod.id"),
-        "modversion" to project.property("mod.version"),
-        "display_name" to project.property("mod.display_name"),
-        "author" to project.property("mod.author"),
-        "description" to project.property("mod.description"),
-        "namespace" to project.property("mod.namespace"),
-        "neo_version" to project.property("neo_version"),
-        "mc" to "[${project.property("minecraft_version")}]"
-    )
-
-    inputs.properties(metadataProperties)
-    filesMatching("META-INF/neoforge.mods.toml") {
-        expand(metadataProperties)
-    }
 }
