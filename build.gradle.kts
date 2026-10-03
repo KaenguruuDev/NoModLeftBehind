@@ -67,6 +67,10 @@ dependencies {
     implementation(flatLafExtrasDependency)
     implementation(migLayoutDependency)
 
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
+    testImplementation(files(sourceSets.main.get().compileClasspath.files))
+
     // NeoForge 1.21.1 needs non-Minecraft libraries on the development run classpath.
     add("additionalRuntimeClasspath", flatLafDependency)
     add("additionalRuntimeClasspath", flatLafExtrasDependency)
@@ -76,6 +80,10 @@ dependencies {
     jarJar(flatLafDependency)
     jarJar(flatLafExtrasDependency)
     jarJar(migLayoutDependency)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 tasks.withType<JavaCompile>().configureEach {
