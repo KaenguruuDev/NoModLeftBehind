@@ -20,7 +20,8 @@ import java.nio.file.Files;
 import java.util.*;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 public final class StartupWindow {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -28,9 +29,9 @@ public final class StartupWindow {
     public void show(
         List<DownloadableModConfiguration> missingMods,
         Consumer<StartupDecision> decisionHandler,
-        Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
+        Predicate<DownloadableModConfiguration> dontShowAgainHandler,
         boolean neverAskForOptionals,
-        Function<Boolean, Boolean> optionalPreferenceHandler
+        UnaryOperator<Boolean> optionalPreferenceHandler
     ) {
         if (GraphicsEnvironment.isHeadless()) {
             LOGGER.error("Cannot open the startup window because AWT is running without a display.");
@@ -50,9 +51,9 @@ public final class StartupWindow {
     private void createWindow(
         List<DownloadableModConfiguration> missingMods,
         Consumer<StartupDecision> decisionHandler,
-        Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
+        Predicate<DownloadableModConfiguration> dontShowAgainHandler,
         boolean neverAskForOptionals,
-        Function<Boolean, Boolean> optionalPreferenceHandler
+        UnaryOperator<Boolean> optionalPreferenceHandler
     ) {
         try {
             StartupWindowStyle.installLookAndFeel();
@@ -103,7 +104,7 @@ public final class StartupWindow {
 
         try {
             window.setVisible(true);
-        } catch (RuntimeException | Error exception) {
+        } catch (Exception exception) {
             if (watcher != null) {
                 watcher.close();
             }
@@ -129,9 +130,9 @@ public final class StartupWindow {
         List<DownloadableModConfiguration> sortedMissingMods,
         int requiredCount,
         int optionalCount,
-        Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
+        Predicate<DownloadableModConfiguration> dontShowAgainHandler,
         boolean neverAskForOptionals,
-        Function<Boolean, Boolean> optionalPreferenceHandler
+        UnaryOperator<Boolean> optionalPreferenceHandler
     ) {
         var contentParts = createContent(
             sortedMissingMods,
@@ -152,9 +153,9 @@ public final class StartupWindow {
         List<DownloadableModConfiguration> sortedMissingMods,
         int requiredCount,
         int optionalCount,
-        Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
+        Predicate<DownloadableModConfiguration> dontShowAgainHandler,
         boolean neverAskForOptionals,
-        Function<Boolean, Boolean> optionalPreferenceHandler
+        UnaryOperator<Boolean> optionalPreferenceHandler
     ) {
         var content = StartupWindowStyle.createContent();
         content.add(StartupWindowStyle.createHeading());
@@ -192,7 +193,7 @@ public final class StartupWindow {
         int requiredCount,
         int optionalCount,
         javax.swing.JLabel summary,
-        Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler
+        Predicate<DownloadableModConfiguration> dontShowAgainHandler
     ) {
         var modList = StartupWindowStyle.createModList();
         var modListState = new ModListState(
@@ -232,7 +233,7 @@ public final class StartupWindow {
 
     private ModRow createModRow(
         DownloadableModConfiguration mod,
-        Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
+        Predicate<DownloadableModConfiguration> dontShowAgainHandler,
         Runnable removeRow
     ) {
         var row = StartupWindowStyle.createModRow();
@@ -269,7 +270,7 @@ public final class StartupWindow {
         JPanel row,
         DownloadableModConfiguration mod,
         boolean optional,
-        Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
+        Predicate<DownloadableModConfiguration> dontShowAgainHandler,
         Runnable removeRow
     ) {
         if (!optional) {
@@ -281,7 +282,7 @@ public final class StartupWindow {
         StartupWindowStyle.setFixedWidth(dontShowAgain, 122);
         StartupWindowStyle.setFixedHeight(dontShowAgain, 34);
         dontShowAgain.addActionListener(event -> {
-            if (dontShowAgainHandler.apply(mod)) {
+            if (dontShowAgainHandler.test(mod)) {
                 removeRow.run();
             } else {
                 showPreferenceSaveFailure(dontShowAgain);

@@ -9,7 +9,7 @@ import javax.swing.*;
 import javax.swing.border.MatteBorder;
 import java.awt.*;
 import java.util.Locale;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 final class StartupWindowStyle {
     static final Color WINDOW_BACKGROUND = color("#202328");
@@ -121,7 +121,7 @@ final class StartupWindowStyle {
         return summarySlot;
     }
 
-    public static JCheckBox createOptionalPreference(boolean selected, Function<Boolean, Boolean> changeHandler) {
+    public static JCheckBox createOptionalPreference(boolean selected, UnaryOperator<Boolean> changeHandler) {
         var preference = new JCheckBox("Do not show optional mods on future startups");
         preference.setSelected(selected);
         preference.setFont(SMALL_FONT);
@@ -132,7 +132,7 @@ final class StartupWindowStyle {
         preference.setMargin(new Insets(0, 0, 0, 0));
         preference.addActionListener(event -> {
             var requestedValue = preference.isSelected();
-            if (!changeHandler.apply(requestedValue)) {
+            if (!Boolean.TRUE.equals(changeHandler.apply(requestedValue))) {
                 preference.setSelected(!requestedValue);
                 JOptionPane.showMessageDialog(
                     preference,

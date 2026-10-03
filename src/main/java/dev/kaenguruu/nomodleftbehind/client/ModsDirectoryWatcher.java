@@ -65,21 +65,25 @@ final class ModsDirectoryWatcher implements AutoCloseable {
 
     private void processEvents(WatchKey key) {
         for (var event : key.pollEvents()) {
-            if (event.kind() != StandardWatchEventKinds.ENTRY_CREATE
-                || !(event.context() instanceof Path relativePath)) {
-                continue;
-            }
+            processEvent(event);
+        }
+    }
 
-            var createdPath = directory.resolve(relativePath);
-            if (!Files.isRegularFile(createdPath)) {
-                continue;
-            }
+    private void processEvent(WatchEvent<?> event) {
+        if (event.kind() != StandardWatchEventKinds.ENTRY_CREATE
+            || !(event.context() instanceof Path relativePath)) {
+            return;
+        }
 
-            try {
-                fileCreatedHandler.accept(createdPath);
-            } catch (RuntimeException exception) {
-                LOGGER.warn("Unable to process a newly created file in the mods directory: {}", createdPath, exception);
-            }
+        var createdPath = directory.resolve(relativePath);
+        if (!Files.isRegularFile(createdPath)) {
+            return;
+        }
+
+        try {
+            fileCreatedHandler.accept(createdPath);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Unable to process a newly created file in the mods directory: {}", createdPath, exception);
         }
     }
 
