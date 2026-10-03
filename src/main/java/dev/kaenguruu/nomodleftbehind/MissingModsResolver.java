@@ -8,11 +8,7 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Pattern;
 
 public final class MissingModsResolver {
@@ -44,6 +40,16 @@ public final class MissingModsResolver {
         return missingMods;
     }
 
+    public static List<DownloadableModConfiguration> findModsMatchingFileName(
+        List<DownloadableModConfiguration> mods,
+        String fileName
+    ) {
+        var cachedPatterns = ConfigurationValidator.getCachedRegexPatterns();
+        return mods.stream()
+            .filter(mod -> matchesFileName(mod, fileName, cachedPatterns))
+            .toList();
+    }
+
     private static List<String> getInstalledModFileNames() throws IOException {
         try (var paths = Files.list(FMLPaths.MODSDIR.get())) {
             return paths.filter(Files::isRegularFile).map(path -> path.getFileName().toString()).toList();
@@ -53,13 +59,22 @@ public final class MissingModsResolver {
     private static boolean isModPresent(DownloadableModConfiguration mod, List<String> installedModFileNames, Map<String, Pattern> cachedPatterns, Set<String> matchedFileNames) {
         var pattern = cachedPatterns.get(mod.filePattern());
         for (var fileName : installedModFileNames) {
-            if (pattern.matcher(fileName).matches()) {
+            if (pattern != null && pattern.matcher(fileName).matches()) {
                 warnIfAlreadyMatched(mod, fileName, matchedFileNames);
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static boolean matchesFileName(
+        DownloadableModConfiguration mod,
+        String fileName,
+        Map<String, Pattern> cachedPatterns
+    ) {
+        var pattern = cachedPatterns.get(mod.filePattern());
+        return pattern != null && pattern.matcher(fileName).matches();
     }
 
     private static void warnIfAlreadyMatched(DownloadableModConfiguration mod, String fileName, Set<String> matchedFileNames) {

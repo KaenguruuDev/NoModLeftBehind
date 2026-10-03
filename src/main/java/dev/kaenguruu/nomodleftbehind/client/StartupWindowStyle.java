@@ -20,6 +20,7 @@ final class StartupWindowStyle {
     static final Color TITLEBAR_TEXT = color("#BFC6D0");
     static final Color REQUIRED_COLOR = color("#F08B82");
     static final Color OPTIONAL_COLOR = color("#E3BC65");
+    static final Color ADDED_COLOR = color("#79C99A");
     static final Color BUTTON_BACKGROUND = color("#30353D");
     static final Color BUTTON_BORDER = color("#454D59");
     static final Color ACCENT = color("#6D9EEB");
@@ -31,6 +32,7 @@ final class StartupWindowStyle {
 
     private static FlatSVGIcon requiredIcon;
     private static FlatSVGIcon optionalIcon;
+    private static FlatSVGIcon addedIcon;
 
     private StartupWindowStyle() {
         /* This utility class should not be instantiated */
@@ -246,6 +248,17 @@ final class StartupWindowStyle {
         return status;
     }
 
+    public static void markRequirementAdded(JPanel status) {
+        status.removeAll();
+
+        var addedIconLabel = new JLabel(getAddedIcon());
+        addedIconLabel.getAccessibleContext().setAccessibleName("Added");
+        status.add(addedIconLabel);
+        status.add(createLabel("Added", SMALL_FONT, ADDED_COLOR));
+        status.revalidate();
+        status.repaint();
+    }
+
     private static FlatSVGIcon getRequirementIcon(boolean optional, Color requirementColor) {
         if (optional) {
             if (optionalIcon == null) {
@@ -258,6 +271,13 @@ final class StartupWindowStyle {
             requiredIcon = createRequirementIcon("/assets/required.svg", requirementColor);
         }
         return requiredIcon;
+    }
+
+    private static FlatSVGIcon getAddedIcon() {
+        if (addedIcon == null) {
+            addedIcon = createRequirementIcon("/assets/added.svg", ADDED_COLOR);
+        }
+        return addedIcon;
     }
 
     private static FlatSVGIcon createRequirementIcon(String resourcePath, Color color) {

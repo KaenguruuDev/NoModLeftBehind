@@ -1,6 +1,7 @@
 package dev.kaenguruu.nomodleftbehind.client;
 
 import com.mojang.logging.LogUtils;
+import dev.kaenguruu.nomodleftbehind.MissingModsResolver;
 import dev.kaenguruu.nomodleftbehind.configuration.model.DownloadableModConfiguration;
 import dev.kaenguruu.nomodleftbehind.startup.StartupDecision;
 import net.neoforged.fml.loading.FMLPaths;
@@ -16,9 +17,8 @@ import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
-import java.util.Comparator;
+import java.util.*;
 import java.util.List;
-import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -90,15 +90,39 @@ public final class StartupWindow {
         window.setContentPane(windowParts.root());
         window.setSize(new Dimension(736, 584));
         window.setLocationRelativeTo(null);
-        window.setVisible(true);
+        var watcher = startModsDirectoryWatcher(windowParts.modListState());
         window.addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosed(WindowEvent event) {
+                if (watcher != null) {
+                    watcher.close();
+                }
                 decisionHandler.accept(hasRequiredMods ? StartupDecision.EXIT : StartupDecision.CONTINUE);
             }
         });
 
+        try {
+            window.setVisible(true);
+        } catch (RuntimeException | Error exception) {
+            if (watcher != null) {
+                watcher.close();
+            }
+            throw exception;
+        }
+
         return window;
+    }
+
+    private static ModsDirectoryWatcher startModsDirectoryWatcher(ModListState modListState) {
+        try {
+            return ModsDirectoryWatcher.start(
+                FMLPaths.MODSDIR.get(),
+                path -> modListState.markAddedForFile(path.getFileName().toString())
+            );
+        } catch (IOException exception) {
+            LOGGER.warn("Unable to watch the mods directory for newly added files.", exception);
+            return null;
+        }
     }
 
     private WindowParts createWindowParts(
@@ -109,7 +133,7 @@ public final class StartupWindow {
         boolean neverAskForOptionals,
         Function<Boolean, Boolean> optionalPreferenceHandler
     ) {
-        var content = createContent(
+        var contentParts = createContent(
             sortedMissingMods,
             requiredCount,
             optionalCount,
@@ -119,12 +143,12 @@ public final class StartupWindow {
         );
         var closeButton = StartupWindowStyle.createCloseButton();
         var titlebar = StartupWindowStyle.createTitlebar(closeButton);
-        var root = StartupWindowStyle.createRoot(titlebar, content);
+        var root = StartupWindowStyle.createRoot(titlebar, contentParts.content());
 
-        return new WindowParts(root, titlebar, closeButton);
+        return new WindowParts(root, titlebar, closeButton, contentParts.modListState());
     }
 
-    private JPanel createContent(
+    private ContentParts createContent(
         List<DownloadableModConfiguration> sortedMissingMods,
         int requiredCount,
         int optionalCount,
@@ -144,13 +168,14 @@ public final class StartupWindow {
         );
         content.add(StartupWindowStyle.createSummarySlot(summary));
 
-        content.add(createModListScrollPane(
+        var modListParts = createModListScrollPane(
             sortedMissingMods,
             requiredCount,
             optionalCount,
             summary,
             dontShowAgainHandler
-        ));
+        );
+        content.add(modListParts.scrollPane());
 
         var optionalPreference = StartupWindowStyle.createOptionalPreference(
             neverAskForOptionals,
@@ -159,10 +184,10 @@ public final class StartupWindow {
         content.add(StartupWindowStyle.createPreferenceSlot(optionalPreference));
         content.add(createFooter(sortedMissingMods));
 
-        return content;
+        return new ContentParts(content, modListParts.modListState());
     }
 
-    private JScrollPane createModListScrollPane(
+    private ModListParts createModListScrollPane(
         List<DownloadableModConfiguration> sortedMissingMods,
         int requiredCount,
         int optionalCount,
@@ -170,14 +195,20 @@ public final class StartupWindow {
         Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler
     ) {
         var modList = StartupWindowStyle.createModList();
-        var modListState = new ModListState(modList, summary, requiredCount, optionalCount);
+        var modListState = new ModListState(
+            modList,
+            summary,
+            requiredCount,
+            optionalCount,
+            sortedMissingMods
+        );
         for (var mod : sortedMissingMods) {
-            var row = createModRow(mod, dontShowAgainHandler, () -> modListState.remove(mod));
-            modListState.add(mod, row);
+            var modRow = createModRow(mod, dontShowAgainHandler, () -> modListState.remove(mod));
+            modListState.add(mod, modRow.row(), modRow.status());
         }
 
         modListState.refreshBorders();
-        return StartupWindowStyle.createModListScrollPane(modList);
+        return new ModListParts(StartupWindowStyle.createModListScrollPane(modList), modListState);
     }
 
     private JPanel createFooter(
@@ -199,26 +230,27 @@ public final class StartupWindow {
         return footer;
     }
 
-    private JPanel createModRow(
+    private ModRow createModRow(
         DownloadableModConfiguration mod,
         Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
         Runnable removeRow
     ) {
         var row = StartupWindowStyle.createModRow();
         var optional = mod.isOptional();
+        var status = StartupWindowStyle.createRequirementStatus(optional);
         row.add(
             StartupWindowStyle.createIdentity(mod.name(), displayHost(mod.url()), mod.url()),
             StartupWindowStyle.identityConstraints()
         );
         row.add(
-            StartupWindowStyle.createRequirementStatus(optional),
+            status,
             StartupWindowStyle.statusConstraints()
         );
 
         addDownloadButton(row, mod);
         addOptionalAction(row, mod, optional, dontShowAgainHandler, removeRow);
 
-        return row;
+        return new ModRow(row, status);
     }
 
     private void addDownloadButton(
@@ -362,38 +394,83 @@ public final class StartupWindow {
         }
     }
 
-    private record WindowParts(JPanel root, JPanel titlebar, JButton closeButton) {
+    private record WindowParts(
+        JPanel root,
+        JPanel titlebar,
+        JButton closeButton,
+        ModListState modListState
+    ) {
+    }
+
+    private record ContentParts(JPanel content, ModListState modListState) {
+    }
+
+    private record ModListParts(JScrollPane scrollPane, ModListState modListState) {
+    }
+
+    private record ModRow(JPanel row, JPanel status) {
     }
 
     private static final class ModListState {
         private final JPanel modList;
         private final javax.swing.JLabel summary;
         private final int requiredCount;
-        private final List<JPanel> rows = new java.util.ArrayList<>();
+        private final List<DownloadableModConfiguration> trackedMods;
+        private final Map<DownloadableModConfiguration, JPanel> rows = new HashMap<>();
+        private final Map<DownloadableModConfiguration, JPanel> statusPanels = new HashMap<>();
+        private final Set<DownloadableModConfiguration> addedMods = new HashSet<>();
         private int remainingOptionalCount;
 
-        private ModListState(JPanel modList, javax.swing.JLabel summary, int requiredCount, int optionalCount) {
+        private ModListState(
+            JPanel modList,
+            javax.swing.JLabel summary,
+            int requiredCount,
+            int optionalCount,
+            List<DownloadableModConfiguration> trackedMods
+        ) {
             this.modList = modList;
             this.summary = summary;
             this.requiredCount = requiredCount;
             this.remainingOptionalCount = optionalCount;
+            this.trackedMods = List.copyOf(trackedMods);
         }
 
-        private void add(DownloadableModConfiguration mod, JPanel row) {
-            row.putClientProperty(mod, Boolean.TRUE);
-            rows.add(row);
+        private void add(DownloadableModConfiguration mod, JPanel row, JPanel status) {
+            rows.put(mod, row);
+            statusPanels.put(mod, status);
             modList.add(row);
         }
 
         private void remove(DownloadableModConfiguration mod) {
-            rows.stream()
-                .filter(candidate -> candidate.getClientProperty(mod) != null)
-                .findFirst()
-                .ifPresent(modList::remove);
+            var row = rows.remove(mod);
+            statusPanels.remove(mod);
+            if (row != null) {
+                modList.remove(row);
+            }
             summary.setText(summaryText(requiredCount, --remainingOptionalCount));
             refreshBorders();
             modList.revalidate();
             modList.repaint();
+        }
+
+        private void markAddedForFile(String fileName) {
+            var matchingMods = MissingModsResolver.findModsMatchingFileName(trackedMods, fileName);
+            if (matchingMods.isEmpty()) {
+                return;
+            }
+
+            SwingUtilities.invokeLater(() -> matchingMods.forEach(this::markAdded));
+        }
+
+        private void markAdded(DownloadableModConfiguration mod) {
+            if (!addedMods.add(mod)) {
+                return;
+            }
+
+            var status = statusPanels.get(mod);
+            if (status != null) {
+                StartupWindowStyle.markRequirementAdded(status);
+            }
         }
 
         private void refreshBorders() {

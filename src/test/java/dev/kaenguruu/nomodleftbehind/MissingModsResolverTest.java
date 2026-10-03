@@ -61,6 +61,21 @@ class MissingModsResolverTest {
         );
     }
 
+    @Test
+    void findsModsMatchingANewlyCreatedFileName() {
+        var matching = mod("matching-[0-9]+\\.jar", "Matching Mod");
+        var notMatching = mod("other-[0-9]+\\.jar", "Other Mod");
+        validatePatterns(matching, notMatching);
+
+        assertEquals(
+            List.of(matching),
+            MissingModsResolver.findModsMatchingFileName(
+                List.of(matching, notMatching),
+                "matching-1.jar"
+            )
+        );
+    }
+
     private static DownloadableModConfiguration mod(String filePattern, String name) {
         return new DownloadableModConfiguration(
             "https://modrinth.com/" + name.toLowerCase().replace(' ', '-') + ".jar",
