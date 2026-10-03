@@ -14,9 +14,47 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+          cache-cleanup: always
       - name: Build
         run: ./gradlew build --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: NoModLeftBehind
           path: build/libs/*.jar
+
+  neoforge-matrix:
+    name: NeoForge version matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+          # Keep artifacts for every matrix target; cleanup based only on the
+          # final Gradle invocation could discard earlier Minecraft versions.
+          cache-cleanup: never
+      - name: Restore NeoForge generated artifacts
+        uses: actions/cache@v4
+        with:
+          path: build/moddev
+          key: ${{ runner.os }}-neoforge-moddev-${{ hashFiles('build.gradle.kts', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', 'scripts/test-neoforge-matrix.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-neoforge-moddev-
+      - name: Test supported Minecraft versions
+        run: ./scripts/test-neoforge-matrix.sh
+      - name: Upload NeoForge matrix logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neoforge-matrix-logs
+          path: build/neoforge-matrix-logs/
+          if-no-files-found: warn
