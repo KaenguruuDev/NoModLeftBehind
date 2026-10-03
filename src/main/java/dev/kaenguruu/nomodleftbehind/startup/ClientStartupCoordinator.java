@@ -72,7 +72,8 @@ public final class ClientStartupCoordinator {
             missingMods,
             decision::complete,
             disabledOptionalDownloadsState::skipOptionalMod,
-            disabledOptionalDownloadsState::skipAllOptionalMods
+            disabledOptionalDownloadsState.neverAskForOptionalsEnabled(),
+            disabledOptionalDownloadsState::setNeverAskForOptionals
         );
 
         try {
@@ -107,9 +108,13 @@ public final class ClientStartupCoordinator {
             ));
         }
 
-        private void skipAllOptionalMods() {
+        private boolean neverAskForOptionalsEnabled() {
+            return configuration.neverAskForOptionals();
+        }
+
+        private void setNeverAskForOptionals(boolean neverAskForOptionals) {
             save(new DisabledOptionalDownloadsConfiguration(
-                true,
+                neverAskForOptionals,
                 configuration.skipForOptionalModUrl()
             ));
         }
