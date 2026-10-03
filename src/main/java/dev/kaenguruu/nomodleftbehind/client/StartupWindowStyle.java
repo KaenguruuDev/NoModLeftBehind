@@ -29,6 +29,9 @@ final class StartupWindowStyle {
     static final Font TITLE_FONT = BASE_FONT.deriveFont(24f);
     static final Font BUTTON_FONT = BASE_FONT.deriveFont(12f);
 
+    private static FlatSVGIcon requiredIcon;
+    private static FlatSVGIcon optionalIcon;
+
     private StartupWindowStyle() {
         /* This utility class should not be instantiated */
     }
@@ -226,14 +229,7 @@ final class StartupWindowStyle {
         var status = new JPanel(new FlowLayout(FlowLayout.LEFT, 7, 0));
         status.setOpaque(false);
 
-        var requirementIconPath = optional ? "/assets/optional.svg" : "/assets/required.svg";
-        var requirementIconResource = StartupWindowStyle.class.getResource(requirementIconPath);
-        if (requirementIconResource == null) {
-            throw new IllegalStateException("Missing startup window icon resource: " + requirementIconPath);
-        }
-
-        var requirementIcon = new FlatSVGIcon(requirementIconResource).derive(17, 17);
-        requirementIcon.setColorFilter(new FlatSVGIcon.ColorFilter(color -> requirementColor));
+        var requirementIcon = getRequirementIcon(optional, requirementColor);
 
         var requirementIconLabel = new JLabel(requirementIcon);
         requirementIconLabel.getAccessibleContext().setAccessibleName(optional ? "Optional" : "Required");
@@ -248,6 +244,31 @@ final class StartupWindowStyle {
         setFixedWidth(status, 102);
 
         return status;
+    }
+
+    private static FlatSVGIcon getRequirementIcon(boolean optional, Color requirementColor) {
+        if (optional) {
+            if (optionalIcon == null) {
+                optionalIcon = createRequirementIcon("/assets/optional.svg", requirementColor);
+            }
+            return optionalIcon;
+        }
+
+        if (requiredIcon == null) {
+            requiredIcon = createRequirementIcon("/assets/required.svg", requirementColor);
+        }
+        return requiredIcon;
+    }
+
+    private static FlatSVGIcon createRequirementIcon(String resourcePath, Color color) {
+        var resource = StartupWindowStyle.class.getResource(resourcePath);
+        if (resource == null) {
+            throw new IllegalStateException("Missing startup window icon resource: " + resourcePath);
+        }
+
+        var icon = new FlatSVGIcon(resource).derive(17, 17);
+        icon.setColorFilter(new FlatSVGIcon.ColorFilter(ignored -> color));
+        return icon;
     }
 
     public static JPanel createEmptyActions() {
