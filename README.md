@@ -8,6 +8,11 @@ required mods stop startup and missing optional mods are reported as warnings.
 No Mod Left Behind does not download or install the files automatically. The configured URL is used as the source page
 or download link that the player or server administrator can open.
 
+## Download
+
+Download No Mod Left Behind from [Modrinth](https://modrinth.com/mod/no-mod-left-behind). It supports Minecraft
+versions 1.21 through 1.21.8 with NeoForge.
+
 ## Configuration file
 
 The configuration file is created automatically at `config/nomodsleftbehind/nomodleftbehind.json` relative to the
