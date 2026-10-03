@@ -73,6 +73,7 @@ public final class ConfigurationValidator {
             }
 
             var urlPath = modPath + ".url";
+            validateName(modPath + ".name", mod.name(), issues);
             validateUrl(urlPath, mod.url(), issues);
             if (mod.url() != null && !mod.url().isBlank() && !configuredUrls.add(mod.url())) {
                 issues.add(new ConfigurationIssue(
@@ -82,6 +83,20 @@ public final class ConfigurationValidator {
                 ));
             }
             validateFilePattern(modPath + ".filePattern", mod.filePattern(), issues);
+        }
+    }
+
+    private static void validateName(
+        String path,
+        String value,
+        List<ConfigurationIssue> issues
+    ) {
+        if (value == null || value.isBlank()) {
+            issues.add(new ConfigurationIssue(
+                path,
+                ConfigurationError.MISSING_NAME,
+                "Name must be provided."
+            ));
         }
     }
 

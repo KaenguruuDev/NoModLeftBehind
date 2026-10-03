@@ -4,6 +4,7 @@ public enum ConfigurationError {
     NULL_CONFIGURATION,
     NULL_MOD_LIST,
     NULL_MOD_ENTRY,
+    MISSING_NAME,
     MISSING_URL,
     INVALID_URL,
     DUPLICATE_URL,

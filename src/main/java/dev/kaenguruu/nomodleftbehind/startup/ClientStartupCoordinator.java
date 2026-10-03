@@ -95,14 +95,14 @@ public final class ClientStartupCoordinator {
             this.configuration = configuration;
         }
 
-        private void skipOptionalMod(DownloadableModConfiguration mod) {
+        private boolean skipOptionalMod(DownloadableModConfiguration mod) {
             Map<String, Boolean> skippedOptionalModUrls = new HashMap<>();
             if (configuration.skipForOptionalModUrl() != null) {
                 skippedOptionalModUrls.putAll(configuration.skipForOptionalModUrl());
             }
             skippedOptionalModUrls.put(mod.url(), true);
 
-            save(new DisabledOptionalDownloadsConfiguration(
+            return save(new DisabledOptionalDownloadsConfiguration(
                 configuration.neverAskForOptionals(),
                 skippedOptionalModUrls
             ));
@@ -112,17 +112,20 @@ public final class ClientStartupCoordinator {
             return configuration.neverAskForOptionals();
         }
 
-        private void setNeverAskForOptionals(boolean neverAskForOptionals) {
-            save(new DisabledOptionalDownloadsConfiguration(
+        private boolean setNeverAskForOptionals(boolean neverAskForOptionals) {
+            return save(new DisabledOptionalDownloadsConfiguration(
                 neverAskForOptionals,
                 configuration.skipForOptionalModUrl()
             ));
         }
 
-        private void save(DisabledOptionalDownloadsConfiguration updatedConfiguration) {
+        private boolean save(DisabledOptionalDownloadsConfiguration updatedConfiguration) {
             if (ConfigurationLoader.trySaveDisabledOptionalDownloadsConfiguration(updatedConfiguration)) {
                 configuration = updatedConfiguration;
+                return true;
             }
+
+            return false;
         }
     }
 }

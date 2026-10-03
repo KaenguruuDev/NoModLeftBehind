@@ -5,21 +5,11 @@ import com.formdev.flatlaf.FlatDarkLaf;
 import com.formdev.flatlaf.extras.FlatSVGIcon;
 import net.miginfocom.swing.MigLayout;
 
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.ScrollPaneConstants;
-import javax.swing.SwingConstants;
-import javax.swing.UIManager;
+import javax.swing.*;
 import javax.swing.border.MatteBorder;
 import java.awt.*;
 import java.util.Locale;
-import java.util.function.Consumer;
+import java.util.function.Function;
 
 final class StartupWindowStyle {
     static final Color WINDOW_BACKGROUND = color("#202328");
@@ -115,7 +105,7 @@ final class StartupWindowStyle {
         return summarySlot;
     }
 
-    public static JCheckBox createOptionalPreference(boolean selected, Consumer<Boolean> changeHandler) {
+    public static JCheckBox createOptionalPreference(boolean selected, Function<Boolean, Boolean> changeHandler) {
         var preference = new JCheckBox("Do not show optional mods on future startups");
         preference.setSelected(selected);
         preference.setFont(SMALL_FONT);
@@ -124,7 +114,18 @@ final class StartupWindowStyle {
         preference.setFocusPainted(false);
         preference.setIconTextGap(9);
         preference.setMargin(new Insets(0, 0, 0, 0));
-        preference.addActionListener(event -> changeHandler.accept(preference.isSelected()));
+        preference.addActionListener(event -> {
+            var requestedValue = preference.isSelected();
+            if (!changeHandler.apply(requestedValue)) {
+                preference.setSelected(!requestedValue);
+                JOptionPane.showMessageDialog(
+                    preference,
+                    "Unable to save this preference. Your change was not applied.",
+                    "Preference not saved",
+                    JOptionPane.ERROR_MESSAGE
+                );
+            }
+        });
 
         return preference;
     }

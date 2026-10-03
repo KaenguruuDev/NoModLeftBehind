@@ -93,6 +93,7 @@ tasks.processResources {
         "author" to project.property("mod.author"),
         "description" to project.property("mod.description"),
         "namespace" to project.property("mod.namespace"),
+        "neo_version" to project.property("neo_version"),
         "mc" to "[${project.property("minecraft_version")}]"
     )
 

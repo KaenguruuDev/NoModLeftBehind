@@ -7,20 +7,12 @@ import net.neoforged.fml.loading.FMLPaths;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.SwingUtilities;
-import javax.swing.WindowConstants;
-import java.awt.AWTError;
-import java.awt.Desktop;
-import java.awt.Dimension;
-import java.awt.GraphicsEnvironment;
-import java.awt.HeadlessException;
-import java.awt.Point;
+import javax.swing.*;
+import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -28,6 +20,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 public final class StartupWindow {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -35,9 +28,9 @@ public final class StartupWindow {
     public void show(
         List<DownloadableModConfiguration> missingMods,
         Consumer<StartupDecision> decisionHandler,
-        Consumer<DownloadableModConfiguration> dontShowAgainHandler,
+        Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
         boolean neverAskForOptionals,
-        Consumer<Boolean> optionalPreferenceHandler
+        Function<Boolean, Boolean> optionalPreferenceHandler
     ) {
         if (GraphicsEnvironment.isHeadless()) {
             LOGGER.error("Cannot open the startup window because AWT is running without a display.");
@@ -57,9 +50,9 @@ public final class StartupWindow {
     private void createWindow(
         List<DownloadableModConfiguration> missingMods,
         Consumer<StartupDecision> decisionHandler,
-        Consumer<DownloadableModConfiguration> dontShowAgainHandler,
+        Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
         boolean neverAskForOptionals,
-        Consumer<Boolean> optionalPreferenceHandler
+        Function<Boolean, Boolean> optionalPreferenceHandler
     ) {
         try {
             StartupWindowStyle.installLookAndFeel();
@@ -84,6 +77,9 @@ public final class StartupWindow {
         } catch (HeadlessException | AWTError exception) {
             LOGGER.error("Failed to open the startup window because AWT is unavailable.", exception);
             decisionHandler.accept(StartupDecision.EXIT);
+        } catch (RuntimeException exception) {
+            LOGGER.error("Failed to open the startup window because of an unexpected UI error.", exception);
+            decisionHandler.accept(StartupDecision.EXIT);
         }
     }
 
@@ -96,9 +92,9 @@ public final class StartupWindow {
         window.setSize(new Dimension(736, 584));
         window.setLocationRelativeTo(null);
         window.setVisible(true);
-        window.addWindowListener(new java.awt.event.WindowAdapter() {
+        window.addWindowListener(new WindowAdapter() {
             @Override
-            public void windowClosed(java.awt.event.WindowEvent event) {
+            public void windowClosed(WindowEvent event) {
                 decisionHandler.accept(hasRequiredMods ? StartupDecision.EXIT : StartupDecision.CONTINUE);
             }
         });
@@ -111,9 +107,9 @@ public final class StartupWindow {
         int requiredCount,
         int optionalCount,
         Consumer<StartupDecision> decisionHandler,
-        Consumer<DownloadableModConfiguration> dontShowAgainHandler,
+        Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
         boolean neverAskForOptionals,
-        Consumer<Boolean> optionalPreferenceHandler
+        Function<Boolean, Boolean> optionalPreferenceHandler
     ) {
         var content = createContent(
             sortedMissingMods,
@@ -136,9 +132,9 @@ public final class StartupWindow {
         int requiredCount,
         int optionalCount,
         Consumer<StartupDecision> decisionHandler,
-        Consumer<DownloadableModConfiguration> dontShowAgainHandler,
+        Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
         boolean neverAskForOptionals,
-        Consumer<Boolean> optionalPreferenceHandler
+        Function<Boolean, Boolean> optionalPreferenceHandler
     ) {
         var content = StartupWindowStyle.createContent();
         content.add(StartupWindowStyle.createHeading());
@@ -176,7 +172,7 @@ public final class StartupWindow {
         int optionalCount,
         javax.swing.JLabel summary,
         Consumer<StartupDecision> decisionHandler,
-        Consumer<DownloadableModConfiguration> dontShowAgainHandler
+        Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler
     ) {
         var modList = StartupWindowStyle.createModList();
         var modListState = new ModListState(modList, summary, requiredCount, optionalCount);
@@ -203,7 +199,6 @@ public final class StartupWindow {
         StartupWindowStyle.setFixedHeight(downloadAll, 34);
         downloadAll.addActionListener(event -> {
             sortedMissingMods.forEach(mod -> openUrl(mod.url()));
-            decisionHandler.accept(StartupDecision.EXIT);
         });
 
         footer.add(openModsDirectory, "left, top");
@@ -214,7 +209,7 @@ public final class StartupWindow {
 
     private JPanel createModRow(
         DownloadableModConfiguration mod,
-        Consumer<DownloadableModConfiguration> dontShowAgainHandler,
+        Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
         Consumer<StartupDecision> decisionHandler,
         Runnable removeRow
     ) {
@@ -245,7 +240,6 @@ public final class StartupWindow {
         StartupWindowStyle.setFixedHeight(download, 34);
         download.addActionListener(event -> {
             openUrl(mod.url());
-            decisionHandler.accept(StartupDecision.EXIT);
         });
 
         row.add(download, StartupWindowStyle.actionConstraints(2, 12));
@@ -255,7 +249,7 @@ public final class StartupWindow {
         JPanel row,
         DownloadableModConfiguration mod,
         boolean optional,
-        Consumer<DownloadableModConfiguration> dontShowAgainHandler,
+        Function<DownloadableModConfiguration, Boolean> dontShowAgainHandler,
         Runnable removeRow
     ) {
         if (!optional) {
@@ -267,10 +261,22 @@ public final class StartupWindow {
         StartupWindowStyle.setFixedWidth(dontShowAgain, 122);
         StartupWindowStyle.setFixedHeight(dontShowAgain, 34);
         dontShowAgain.addActionListener(event -> {
-            dontShowAgainHandler.accept(mod);
-            removeRow.run();
+            if (dontShowAgainHandler.apply(mod)) {
+                removeRow.run();
+            } else {
+                showPreferenceSaveFailure(dontShowAgain);
+            }
         });
         row.add(dontShowAgain, StartupWindowStyle.actionConstraints(3, 16));
+    }
+
+    private static void showPreferenceSaveFailure(Component parent) {
+        JOptionPane.showMessageDialog(
+            parent,
+            "Unable to save this preference. Your change was not applied.",
+            "Preference not saved",
+            JOptionPane.ERROR_MESSAGE
+        );
     }
 
     private static List<DownloadableModConfiguration> sortMissingMods(

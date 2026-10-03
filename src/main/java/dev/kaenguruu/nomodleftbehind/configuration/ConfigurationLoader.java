@@ -11,8 +11,10 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Map;
@@ -96,20 +98,42 @@ public final class ConfigurationLoader {
         var configPath = getConfigurationPath("disabled_optional_downloads.json");
         LOGGER.debug("Saving disabled optional downloads configuration to {}", configPath);
 
+        Path temporaryPath = null;
         try {
             Files.createDirectories(configPath.getParent());
+            temporaryPath = Files.createTempFile(
+                configPath.getParent(),
+                configPath.getFileName().toString(),
+                ".tmp"
+            );
             Files.writeString(
-                configPath,
+                temporaryPath,
                 GSON.toJson(configuration),
                 StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.WRITE
             );
+            Files.move(
+                temporaryPath,
+                configPath,
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING
+            );
             return true;
+        } catch (AtomicMoveNotSupportedException exception) {
+            LOGGER.error("Unable to atomically replace disabled optional downloads configuration at {}", configPath, exception);
+            return false;
         } catch (IOException exception) {
             LOGGER.error("Unable to save disabled optional downloads configuration at {}", configPath, exception);
             return false;
+        } finally {
+            if (temporaryPath != null) {
+                try {
+                    Files.deleteIfExists(temporaryPath);
+                } catch (IOException exception) {
+                    LOGGER.warn("Unable to clean up temporary configuration file {}", temporaryPath, exception);
+                }
+            }
         }
     }
 
