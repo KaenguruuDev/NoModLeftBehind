@@ -100,6 +100,8 @@ tasks.jar {
 
 tasks.test {
     useJUnitPlatform()
+    // UI tests exercise Swing components without opening top-level windows.
+    systemProperty("java.awt.headless", "true")
 }
 
 tasks.withType<JavaCompile>().configureEach {

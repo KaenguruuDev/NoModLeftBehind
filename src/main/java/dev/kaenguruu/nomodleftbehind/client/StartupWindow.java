@@ -107,7 +107,7 @@ public final class StartupWindow {
                 if (watcher != null) {
                     watcher.close();
                 }
-                decisionHandler.accept(hasRequiredMods ? StartupDecision.EXIT : StartupDecision.CONTINUE);
+                decisionHandler.accept(closeDecision(hasRequiredMods));
             }
         });
 
@@ -135,7 +135,7 @@ public final class StartupWindow {
         }
     }
 
-    private WindowParts createWindowParts(
+    WindowParts createWindowParts(
         List<ModResolutionResult> sortedMissingMods,
         int requiredCount,
         int optionalCount,
@@ -334,6 +334,22 @@ public final class StartupWindow {
         Runnable removeRow,
         String text
     ) {
+        return createDontShowAgainButton(
+            mod,
+            dontShowAgainHandler,
+            removeRow,
+            text,
+            StartupWindowStyle::showPreferenceSaveFailure
+        );
+    }
+
+    static JButton createDontShowAgainButton(
+        DownloadableModConfiguration mod,
+        Predicate<DownloadableModConfiguration> dontShowAgainHandler,
+        Runnable removeRow,
+        String text,
+        Consumer<Component> failureHandler
+    ) {
         var dontShowAgain = StartupWindowStyle.createQuietButton(text);
         StartupWindowStyle.setFixedWidth(dontShowAgain, 122);
         StartupWindowStyle.setFixedHeight(dontShowAgain, 34);
@@ -341,22 +357,17 @@ public final class StartupWindow {
             if (dontShowAgainHandler.test(mod)) {
                 removeRow.run();
             } else {
-                showPreferenceSaveFailure(dontShowAgain);
+                failureHandler.accept(dontShowAgain);
             }
         });
         return dontShowAgain;
     }
 
-    private static void showPreferenceSaveFailure(Component parent) {
-        JOptionPane.showMessageDialog(
-            parent,
-            "Unable to save this preference. Your change was not applied.",
-            "Preference not saved",
-            JOptionPane.ERROR_MESSAGE
-        );
+    static StartupDecision closeDecision(boolean hasRequiredMods) {
+        return hasRequiredMods ? StartupDecision.EXIT : StartupDecision.CONTINUE;
     }
 
-    private static List<ModResolutionResult> sortMissingMods(
+    static List<ModResolutionResult> sortMissingMods(
         List<ModResolutionResult> unresolvedMods
     ) {
         return unresolvedMods.stream()
@@ -368,29 +379,29 @@ public final class StartupWindow {
             .toList();
     }
 
-    private static int countRequiredMods(List<ModResolutionResult> resolutions) {
+    static int countRequiredMods(List<ModResolutionResult> resolutions) {
         return (int) resolutions.stream()
             .filter(result -> statusType(result) == StartupWindowStyle.ModStatus.REQUIRED)
             .count();
     }
 
-    private static int countOptionalMods(List<ModResolutionResult> resolutions) {
+    static int countOptionalMods(List<ModResolutionResult> resolutions) {
         return (int) resolutions.stream()
             .filter(result -> statusType(result) == StartupWindowStyle.ModStatus.OPTIONAL)
             .count();
     }
 
-    private static int countChecksumMismatches(List<ModResolutionResult> resolutions) {
+    static int countChecksumMismatches(List<ModResolutionResult> resolutions) {
         return (int) resolutions.stream()
             .filter(result -> statusType(result) == StartupWindowStyle.ModStatus.CHECKSUM_MISMATCH)
             .count();
     }
 
-    private static boolean hasRequiredMissingMods(List<ModResolutionResult> resolutions) {
+    static boolean hasRequiredMissingMods(List<ModResolutionResult> resolutions) {
         return countRequiredMods(resolutions) > 0;
     }
 
-    private static String summaryText(int requiredCount, int optionalCount, int checksumMismatchCount) {
+    static String summaryText(int requiredCount, int optionalCount, int checksumMismatchCount) {
         return String.format(
             Locale.ROOT,
             "%d required · %d optional · %d checksum warning%s",
@@ -501,7 +512,7 @@ public final class StartupWindow {
         }
     }
 
-    private record WindowParts(
+    record WindowParts(
         JPanel root,
         JPanel titlebar,
         JButton closeButton,
@@ -518,7 +529,7 @@ public final class StartupWindow {
     private record ModRow(JPanel row, JPanel status) {
     }
 
-    private static final class ModListState {
+    static final class ModListState {
         private final JPanel modList;
         private final javax.swing.JLabel summary;
         private final JPanel checksumWarning;
@@ -560,7 +571,7 @@ public final class StartupWindow {
             modList.repaint();
         }
 
-        private void updateForCreatedFile(Path createdFile) {
+        void updateForCreatedFile(Path createdFile) {
             var fileName = createdFile.getFileName().toString();
             var trackedMods = trackedResolutions.stream()
                 .map(ModResolutionResult::mod)

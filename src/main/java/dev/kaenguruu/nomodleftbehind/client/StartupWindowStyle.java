@@ -12,6 +12,7 @@ import java.awt.*;
 import java.util.EnumMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 final class StartupWindowStyle {
@@ -209,6 +210,14 @@ final class StartupWindowStyle {
     }
 
     public static JCheckBox createOptionalPreference(boolean selected, UnaryOperator<Boolean> changeHandler) {
+        return createOptionalPreference(selected, changeHandler, StartupWindowStyle::showPreferenceSaveFailure);
+    }
+
+    static JCheckBox createOptionalPreference(
+        boolean selected,
+        UnaryOperator<Boolean> changeHandler,
+        Consumer<Component> failureHandler
+    ) {
         var preference = new JCheckBox("Do not show optional mods on future startups");
         preference.setSelected(selected);
         preference.setFont(SMALL_FONT);
@@ -221,16 +230,20 @@ final class StartupWindowStyle {
             var requestedValue = preference.isSelected();
             if (!Boolean.TRUE.equals(changeHandler.apply(requestedValue))) {
                 preference.setSelected(!requestedValue);
-                JOptionPane.showMessageDialog(
-                    preference,
-                    "Unable to save this preference. Your change was not applied.",
-                    "Preference not saved",
-                    JOptionPane.ERROR_MESSAGE
-                );
+                failureHandler.accept(preference);
             }
         });
 
         return preference;
+    }
+
+    static void showPreferenceSaveFailure(Component parent) {
+        JOptionPane.showMessageDialog(
+            parent,
+            "Unable to save this preference. Your change was not applied.",
+            "Preference not saved",
+            JOptionPane.ERROR_MESSAGE
+        );
     }
 
     public static JPanel createPreferenceSlot(JCheckBox preference) {
