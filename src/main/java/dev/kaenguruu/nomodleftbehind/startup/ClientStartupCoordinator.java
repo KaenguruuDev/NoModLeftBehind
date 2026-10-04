@@ -1,9 +1,10 @@
 package dev.kaenguruu.nomodleftbehind.startup;
 
 import com.mojang.logging.LogUtils;
-import dev.kaenguruu.nomodleftbehind.MissingModsResolver;
+import dev.kaenguruu.nomodleftbehind.ModResolutionResult;
+import dev.kaenguruu.nomodleftbehind.ModsResolver;
 import dev.kaenguruu.nomodleftbehind.client.StartupWindow;
-import dev.kaenguruu.nomodleftbehind.configuration.ConfigurationLoader;
+import dev.kaenguruu.nomodleftbehind.configuration.ConfigurationManager;
 import dev.kaenguruu.nomodleftbehind.configuration.model.ConfigurationJsonRoot;
 import dev.kaenguruu.nomodleftbehind.configuration.model.DisabledOptionalDownloadsConfiguration;
 import dev.kaenguruu.nomodleftbehind.configuration.model.DownloadableModConfiguration;
@@ -24,27 +25,37 @@ public final class ClientStartupCoordinator {
 
     public static StartupDecision decide(ConfigurationJsonRoot configuration) {
         try {
-            var disabledOptionalDownloads = ConfigurationLoader.tryLoadDisabledOptionalDownloadsConfiguration();
+            var disabledOptionalDownloads = ConfigurationManager.tryLoadDisabledOptionalDownloadsConfiguration();
             if (disabledOptionalDownloads == null) {
                 LOGGER.error("Unable to load disabled optional downloads configuration. Aborting");
                 return StartupDecision.EXIT;
             }
 
             var disabledOptionalDownloadsState = new DisabledOptionalDownloadsState(disabledOptionalDownloads);
-            var missingMods = MissingModsResolver.detectMissingMods(configuration.clientMods()).stream()
-                .filter(mod -> !shouldHide(mod, disabledOptionalDownloads))
+
+            var unresolvedMods = ModsResolver.resolveMods(configuration.clientMods()).stream()
+                .filter(result -> result.status() != ModResolutionResult.ModResolutionStatus.PRESENT)
+                .filter(result -> !shouldHide(result, disabledOptionalDownloads))
                 .toList();
-            return displayOrContinue(missingMods, disabledOptionalDownloadsState);
+
+            return displayOrContinue(unresolvedMods, disabledOptionalDownloadsState);
         } catch (Exception exception) {
-            LOGGER.error("Unable to detect missing mods due to unhandled exception: {}", exception, exception);
+            LOGGER.error("Unable to resolve configured client mods due to an unhandled exception: {}", exception, exception);
             return StartupDecision.EXIT;
         }
     }
 
     private static boolean shouldHide(
-        DownloadableModConfiguration mod,
+        ModResolutionResult result,
         DisabledOptionalDownloadsConfiguration disabledOptionalDownloads
     ) {
+        var mod = result.mod();
+        if (result.status() == ModResolutionResult.ModResolutionStatus.HASH_MISMATCH) {
+            var skippedChecksumMismatchMods = disabledOptionalDownloads.skipForChecksumMismatchModUrl();
+            return skippedChecksumMismatchMods != null
+                && Boolean.TRUE.equals(skippedChecksumMismatchMods.get(mod.url()));
+        }
+
         if (mod.isRequired()) {
             return false;
         }
@@ -59,19 +70,20 @@ public final class ClientStartupCoordinator {
     }
 
     private static StartupDecision displayOrContinue(
-        List<DownloadableModConfiguration> missingMods,
+        List<ModResolutionResult> unresolvedMods,
         DisabledOptionalDownloadsState disabledOptionalDownloadsState
     ) {
-        if (missingMods.isEmpty()) {
+        if (unresolvedMods.isEmpty()) {
             return StartupDecision.CONTINUE;
         }
 
         var window = new StartupWindow();
         var decision = new CompletableFuture<StartupDecision>();
         window.show(
-            missingMods,
+            unresolvedMods,
             decision::complete,
             disabledOptionalDownloadsState::skipOptionalMod,
+            disabledOptionalDownloadsState::skipChecksumMismatchMod,
             disabledOptionalDownloadsState.neverAskForOptionalsEnabled(),
             disabledOptionalDownloadsState::setNeverAskForOptionals
         );
@@ -104,7 +116,22 @@ public final class ClientStartupCoordinator {
 
             return save(new DisabledOptionalDownloadsConfiguration(
                 configuration.neverAskForOptionals(),
-                skippedOptionalModUrls
+                skippedOptionalModUrls,
+                configuration.skipForChecksumMismatchModUrl()
+            ));
+        }
+
+        private boolean skipChecksumMismatchMod(DownloadableModConfiguration mod) {
+            Map<String, Boolean> skippedChecksumMismatchModUrls = new HashMap<>();
+            if (configuration.skipForChecksumMismatchModUrl() != null) {
+                skippedChecksumMismatchModUrls.putAll(configuration.skipForChecksumMismatchModUrl());
+            }
+            skippedChecksumMismatchModUrls.put(mod.url(), true);
+
+            return save(new DisabledOptionalDownloadsConfiguration(
+                configuration.neverAskForOptionals(),
+                configuration.skipForOptionalModUrl(),
+                skippedChecksumMismatchModUrls
             ));
         }
 
@@ -115,12 +142,13 @@ public final class ClientStartupCoordinator {
         private boolean setNeverAskForOptionals(boolean neverAskForOptionals) {
             return save(new DisabledOptionalDownloadsConfiguration(
                 neverAskForOptionals,
-                configuration.skipForOptionalModUrl()
+                configuration.skipForOptionalModUrl(),
+                configuration.skipForChecksumMismatchModUrl()
             ));
         }
 
         private boolean save(DisabledOptionalDownloadsConfiguration updatedConfiguration) {
-            if (ConfigurationLoader.trySaveDisabledOptionalDownloadsConfiguration(updatedConfiguration)) {
+            if (ConfigurationManager.trySaveDisabledOptionalDownloadsConfiguration(updatedConfiguration)) {
                 configuration = updatedConfiguration;
                 return true;
             }

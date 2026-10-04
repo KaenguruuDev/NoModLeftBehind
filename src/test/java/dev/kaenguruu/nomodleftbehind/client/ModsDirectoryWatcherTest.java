@@ -35,6 +35,26 @@ class ModsDirectoryWatcherTest {
     }
 
     @Test
+    void reportsModifiedRegularFiles() throws IOException, InterruptedException {
+        var changedFiles = new CopyOnWriteArrayList<Path>();
+        var fileChanged = new CountDownLatch(1);
+        var changedFile = modsDirectory.resolve("example-mod.jar");
+        Files.writeString(changedFile, "mod");
+
+        try (var ignored = ModsDirectoryWatcher.start(modsDirectory, path -> {
+            if (path.equals(changedFile)) {
+                changedFiles.add(path);
+                fileChanged.countDown();
+            }
+        })) {
+            Files.writeString(changedFile, "updated mod");
+
+            assertTrue(fileChanged.await(5, TimeUnit.SECONDS));
+            assertEquals(List.of(changedFile), changedFiles);
+        }
+    }
+
+    @Test
     void ignoresNewDirectories() throws IOException, InterruptedException {
         var fileCreated = new CountDownLatch(1);
 
