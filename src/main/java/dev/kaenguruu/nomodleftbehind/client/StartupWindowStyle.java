@@ -39,16 +39,40 @@ final class StartupWindowStyle {
     private static final EnumMap<ModStatus, FlatSVGIcon> STATUS_ICONS = new EnumMap<>(ModStatus.class);
     private static final Map<ModStatus, StatusPresentation> STATUS_PRESENTATIONS = Map.of(
         ModStatus.REQUIRED, new StatusPresentation(
-            "/assets/required.svg", "Required", "Required", REQUIRED_COLOR, 0, 0
+            "/assets/required.svg",
+            "Required",
+            "Required",
+            REQUIRED_COLOR,
+            0,
+            0,
+            "This required mod is missing. Download it and place it in your mods folder to continue."
         ),
         ModStatus.CHECKSUM_MISMATCH, new StatusPresentation(
-            "/assets/warning.svg", "Mismatch", "Checksum mismatch", CHECKSUM_COLOR, 2, 1
+            "/assets/warning.svg",
+            "Mismatch",
+            "Checksum mismatch",
+            CHECKSUM_COLOR,
+            2,
+            1,
+            "This file doesn't match the version specified by the modpack author. Replace it with the correct file."
         ),
         ModStatus.OPTIONAL, new StatusPresentation(
-            "/assets/optional.svg", "Optional", "Optional", OPTIONAL_COLOR, 0, 2
+            "/assets/optional.svg",
+            "Optional",
+            "Optional",
+            OPTIONAL_COLOR,
+            0,
+            2,
+            "This optional mod is missing. Download it if you want to use it, or choose “Don't show again” to hide it."
         ),
         ModStatus.ADDED, new StatusPresentation(
-            "/assets/added.svg", "Added", "Added", ADDED_COLOR, 1, 3
+            "/assets/added.svg",
+            "Added",
+            "Added",
+            ADDED_COLOR,
+            1,
+            3,
+            "Found %s in your mods folder."
         )
     );
 
@@ -289,33 +313,46 @@ final class StartupWindowStyle {
         return row;
     }
 
-    public static JPanel createStatus(ModStatus statusType) {
+    public static JPanel createStatus(ModStatus statusType, String tooltip) {
         var presentation = presentationFor(statusType);
         var status = new JPanel(new FlowLayout(FlowLayout.LEFT, 7, 0));
         status.setOpaque(false);
 
-        status.add(createStatusLabel(statusType, presentation));
+        status.add(createStatusLabel(statusType, presentation, tooltip));
         setFixedWidth(status, STATUS_WIDTH);
 
         return status;
     }
 
-    public static void setStatus(JPanel statusPanel, ModStatus statusType) {
+    public static void setStatus(JPanel statusPanel, ModStatus statusType, String tooltip) {
         var presentation = presentationFor(statusType);
         statusPanel.removeAll();
 
-        statusPanel.add(createStatusLabel(statusType, presentation));
+        statusPanel.add(createStatusLabel(statusType, presentation, tooltip));
         statusPanel.revalidate();
         statusPanel.repaint();
     }
 
-    private static JLabel createStatusLabel(ModStatus statusType, StatusPresentation presentation) {
+    private static JLabel createStatusLabel(
+        ModStatus statusType,
+        StatusPresentation presentation,
+        String tooltip
+    ) {
         var statusLabel = new JLabel(presentation.label(), getStatusIcon(statusType), SwingConstants.LEFT);
         statusLabel.setFont(SMALL_FONT);
         statusLabel.setForeground(presentation.color());
         statusLabel.setIconTextGap(7);
+        statusLabel.setToolTipText(tooltip);
         statusLabel.getAccessibleContext().setAccessibleName(presentation.accessibleName());
         return statusLabel;
+    }
+
+    static String statusTooltip(ModStatus statusType, String fileName) {
+        var tooltip = presentationFor(statusType).tooltip();
+        if (statusType == ModStatus.ADDED) {
+            return tooltip.formatted(fileName == null ? "the mod file" : fileName);
+        }
+        return tooltip;
     }
 
     private static FlatSVGIcon getStatusIcon(ModStatus statusType) {
@@ -539,7 +576,8 @@ final class StartupWindowStyle {
         String accessibleName,
         Color color,
         int priority,
-        int sortOrder
+        int sortOrder,
+        String tooltip
     ) {
     }
 

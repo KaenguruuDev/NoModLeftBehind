@@ -28,6 +28,7 @@ import java.util.function.UnaryOperator;
 
 public final class StartupWindow {
     private static final Logger LOGGER = LogUtils.getLogger();
+
     public void show(
         List<ModResolutionResult> unresolvedMods,
         Consumer<StartupDecision> decisionHandler,
@@ -263,7 +264,10 @@ public final class StartupWindow {
         var mod = resolution.mod();
         var row = StartupWindowStyle.createModRow();
         var statusType = statusType(resolution);
-        var status = StartupWindowStyle.createStatus(statusType);
+        var status = StartupWindowStyle.createStatus(
+            statusType,
+            StartupWindowStyle.statusTooltip(statusType, fileName(resolution.file()))
+        );
         row.add(
             StartupWindowStyle.createIdentity(mod.name(), displayHost(mod.url()), mod.url()),
             StartupWindowStyle.identityConstraints()
@@ -452,6 +456,10 @@ public final class StartupWindow {
             .split("[/;?#]", 2)[0];
     }
 
+    private static String fileName(Path file) {
+        return file == null ? null : file.getFileName().toString();
+    }
+
     private static void openUrl(String url) {
         try {
             if (!Desktop.isDesktopSupported()) {
@@ -565,7 +573,11 @@ public final class StartupWindow {
             for (var resolution : matchingResolutions) {
                 var status = statusForCreatedFile(resolution.mod(), createdFile);
                 if (status != null) {
-                    SwingUtilities.invokeLater(() -> updateStatus(resolution.mod(), status));
+                    SwingUtilities.invokeLater(() -> updateStatus(
+                        resolution.mod(),
+                        status,
+                        fileName
+                    ));
                 }
             }
         }
@@ -590,7 +602,11 @@ public final class StartupWindow {
             }
         }
 
-        private void updateStatus(DownloadableModConfiguration mod, StartupWindowStyle.ModStatus newStatus) {
+        private void updateStatus(
+            DownloadableModConfiguration mod,
+            StartupWindowStyle.ModStatus newStatus,
+            String fileName
+        ) {
             var currentStatus = statuses.get(mod);
             if (currentStatus != null && !StartupWindowStyle.canReplaceStatus(currentStatus, newStatus)) {
                 return;
@@ -599,7 +615,11 @@ public final class StartupWindow {
             statuses.put(mod, newStatus);
             var statusPanel = statusPanels.get(mod);
             if (statusPanel != null) {
-                StartupWindowStyle.setStatus(statusPanel, newStatus);
+                StartupWindowStyle.setStatus(
+                    statusPanel,
+                    newStatus,
+                    StartupWindowStyle.statusTooltip(newStatus, fileName)
+                );
             }
             refreshSummary();
         }
