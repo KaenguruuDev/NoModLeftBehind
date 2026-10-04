@@ -15,7 +15,7 @@ versions 1.21 through 1.21.8 with NeoForge.
 
 ## Configuration file
 
-The configuration file is created automatically at `config/nomodsleftbehind/nomodleftbehind.json` relative to the
+The configuration file is created automatically at `config/nomodleftbehind/nomodleftbehind.json` relative to the
 Minecraft instance directory. An empty file contains three empty lists:
 
 ```json

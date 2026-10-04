@@ -34,14 +34,14 @@ class ConfigurationLoaderTest {
         assertTrue(configuration.serverMods().isEmpty());
         assertTrue(configuration.trustedDomains().isEmpty());
 
-        var configFile = gameDirectory.resolve("config/nomodsleftbehind/nomodleftbehind.json");
+        var configFile = gameDirectory.resolve("config").resolve(ConfigurationLoader.CONFIGURATION_DIRECTORY).resolve("nomodleftbehind.json");
         assertTrue(Files.isRegularFile(configFile));
         assertTrue(Files.readString(configFile).contains("clientMods"));
     }
 
     @Test
     void loadsConfiguredModsFromJson() throws IOException {
-        var configFile = gameDirectory.resolve("config/nomodsleftbehind/nomodleftbehind.json");
+        var configFile = gameDirectory.resolve("config").resolve(ConfigurationLoader.CONFIGURATION_DIRECTORY).resolve("nomodleftbehind.json");
         Files.createDirectories(configFile.getParent());
         Files.writeString(configFile, """
             {
@@ -72,7 +72,7 @@ class ConfigurationLoaderTest {
 
     @Test
     void returnsNullForMalformedConfigurationJson() throws IOException {
-        var configFile = gameDirectory.resolve("config/nomodsleftbehind/nomodleftbehind.json");
+        var configFile = gameDirectory.resolve("config").resolve(ConfigurationLoader.CONFIGURATION_DIRECTORY).resolve("nomodleftbehind.json");
         Files.createDirectories(configFile.getParent());
         Files.writeString(configFile, "{ not valid json");
 
@@ -81,7 +81,7 @@ class ConfigurationLoaderTest {
 
     @Test
     void returnsNullForNullConfigurationJson() throws IOException {
-        var configFile = gameDirectory.resolve("config/nomodsleftbehind/nomodleftbehind.json");
+        var configFile = gameDirectory.resolve("config").resolve(ConfigurationLoader.CONFIGURATION_DIRECTORY).resolve("nomodleftbehind.json");
         Files.createDirectories(configFile.getParent());
         Files.writeString(configFile, "null");
 
@@ -90,7 +90,7 @@ class ConfigurationLoaderTest {
 
     @Test
     void returnsNullForEmptyConfigurationJson() throws IOException {
-        var configFile = gameDirectory.resolve("config/nomodsleftbehind/nomodleftbehind.json");
+        var configFile = gameDirectory.resolve("config").resolve(ConfigurationLoader.CONFIGURATION_DIRECTORY).resolve("nomodleftbehind.json");
         Files.createDirectories(configFile.getParent());
         Files.writeString(configFile, "");
 
@@ -117,7 +117,7 @@ class ConfigurationLoaderTest {
 
     @Test
     void returnsNullForMalformedDisabledOptionalDownloadsJson() throws IOException {
-        var configFile = gameDirectory.resolve("config/nomodsleftbehind/disabled_optional_downloads.json");
+        var configFile = gameDirectory.resolve("config").resolve(ConfigurationLoader.CONFIGURATION_DIRECTORY).resolve("disabled_optional_downloads.json");
         Files.createDirectories(configFile.getParent());
         Files.writeString(configFile, "[]");
 

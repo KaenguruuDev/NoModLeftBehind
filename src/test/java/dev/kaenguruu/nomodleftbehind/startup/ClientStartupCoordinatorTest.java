@@ -1,5 +1,6 @@
 package dev.kaenguruu.nomodleftbehind.startup;
 
+import dev.kaenguruu.nomodleftbehind.configuration.ConfigurationLoader;
 import dev.kaenguruu.nomodleftbehind.configuration.ConfigurationValidator;
 import dev.kaenguruu.nomodleftbehind.configuration.model.ConfigurationJsonRoot;
 import dev.kaenguruu.nomodleftbehind.configuration.model.DownloadableModConfiguration;
@@ -81,7 +82,9 @@ class ClientStartupCoordinatorTest {
     }
 
     private static void writeDisabledOptionalDownloadsConfiguration(String contents) throws IOException {
-        var configFile = FMLPaths.CONFIGDIR.get().resolve("nomodsleftbehind").resolve("disabled_optional_downloads.json");
+        var configFile = FMLPaths.CONFIGDIR.get()
+            .resolve(ConfigurationLoader.CONFIGURATION_DIRECTORY)
+            .resolve("disabled_optional_downloads.json");
         Files.createDirectories(configFile.getParent());
         Files.writeString(configFile, contents);
     }

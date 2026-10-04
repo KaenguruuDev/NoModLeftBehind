@@ -26,7 +26,7 @@ public final class ConfigurationLoader {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final String CONFIGURATION_DIRECTORY = "nomodsleftbehind";
+    public static final String CONFIGURATION_DIRECTORY = "nomodleftbehind";
 
     public static ConfigurationJsonRoot tryLoadConfiguration() {
         var configPath = getConfigurationPath("nomodleftbehind.json");
