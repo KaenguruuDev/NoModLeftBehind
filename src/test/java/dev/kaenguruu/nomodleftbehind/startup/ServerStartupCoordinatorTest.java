@@ -50,6 +50,22 @@ class ServerStartupCoordinatorTest {
         assertEquals(StartupDecision.CONTINUE, ServerStartupCoordinator.decide(configuration(mod)));
     }
 
+    @Test
+    void continuesWhenARequiredServerModHasAChecksumMismatch() throws IOException {
+        var modFile = FMLPaths.MODSDIR.get().resolve("server-1.jar");
+        Files.writeString(modFile, "installed content");
+        var mod = new DownloadableModConfiguration(
+            "Server Mod",
+            "https://modrinth.com/server-mod.jar",
+            "server-1\\.jar",
+            "not-the-installed-file-hash",
+            false
+        );
+        validate(mod);
+
+        assertEquals(StartupDecision.CONTINUE, ServerStartupCoordinator.decide(configuration(mod)));
+    }
+
     private static DownloadableModConfiguration mod(String filePattern, String name, boolean optional) {
         return new DownloadableModConfiguration(
             "https://modrinth.com/" + name.toLowerCase().replace(' ', '-') + ".jar",

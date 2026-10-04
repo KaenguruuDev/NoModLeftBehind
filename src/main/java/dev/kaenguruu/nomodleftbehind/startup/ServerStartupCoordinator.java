@@ -1,9 +1,9 @@
 package dev.kaenguruu.nomodleftbehind.startup;
 
 import com.mojang.logging.LogUtils;
-import dev.kaenguruu.nomodleftbehind.MissingModsResolver;
+import dev.kaenguruu.nomodleftbehind.ModResolutionResult;
+import dev.kaenguruu.nomodleftbehind.ModsResolver;
 import dev.kaenguruu.nomodleftbehind.configuration.model.ConfigurationJsonRoot;
-import dev.kaenguruu.nomodleftbehind.configuration.model.DownloadableModConfiguration;
 import org.slf4j.Logger;
 
 import java.util.List;
@@ -17,29 +17,45 @@ public final class ServerStartupCoordinator {
 
     public static StartupDecision decide(ConfigurationJsonRoot configuration) {
         try {
-            var missingMods = MissingModsResolver.detectMissingMods(configuration.serverMods());
-            return logMissingModsOrContinue(missingMods);
+            var unresolvedMods = ModsResolver.resolveMods(configuration.serverMods()).stream()
+                .filter(result -> result.status() != ModResolutionResult.ModResolutionStatus.PRESENT)
+                .toList();
+            return logUnresolvedModsOrContinue(unresolvedMods);
         } catch (Exception exception) {
-            LOGGER.error("Unable to detect missing mods due to unhandled exception: {}", exception, exception);
+            LOGGER.error("Unable to resolve configured server mods due to an unhandled exception: {}", exception, exception);
             return StartupDecision.EXIT;
         }
     }
 
-    private static StartupDecision logMissingModsOrContinue(List<DownloadableModConfiguration> missingMods) {
-        if (missingMods.isEmpty()) {
+    private static StartupDecision logUnresolvedModsOrContinue(List<ModResolutionResult> unresolvedMods) {
+        if (unresolvedMods.isEmpty()) {
             return StartupDecision.CONTINUE;
         }
 
-        var missingRequiredMod = false;
-        for (var missingMod : missingMods) {
-            if (missingMod.isRequired()) {
-                LOGGER.error("Missing required server mod: '{}'. Please download from '{}'", missingMod.name(), missingMod.url());
-                missingRequiredMod = true;
+        var hasMissingRequiredMod = false;
+        for (var unresolvedMod : unresolvedMods) {
+            var mod = unresolvedMod.mod();
+            if (unresolvedMod.status() == ModResolutionResult.ModResolutionStatus.HASH_MISMATCH) {
+                logChecksumMismatch(unresolvedMod);
+            } else if (mod.isRequired()) {
+                LOGGER.error("Missing required server mod: '{}'. Please download from '{}'", mod.name(), mod.url());
+                hasMissingRequiredMod = true;
             } else {
-                LOGGER.warn("Missing optional server mod: '{}'. Please download from '{}'", missingMod.name(), missingMod.url());
+                LOGGER.warn("Missing optional server mod: '{}'. Please download from '{}'", mod.name(), mod.url());
             }
         }
 
-        return missingRequiredMod ? StartupDecision.EXIT : StartupDecision.CONTINUE;
+        return hasMissingRequiredMod ? StartupDecision.EXIT : StartupDecision.CONTINUE;
+    }
+
+    private static void logChecksumMismatch(ModResolutionResult resolution) {
+        var mod = resolution.mod();
+        LOGGER.warn(
+            "Checksum mismatch for server mod: '{}'. Expected SHA-256 '{}', but found '{}'. Please download from '{}'",
+            mod.name(),
+            mod.fileHash(),
+            resolution.installedHash(),
+            mod.url()
+        );
     }
 }
