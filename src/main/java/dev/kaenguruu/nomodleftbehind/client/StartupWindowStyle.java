@@ -3,12 +3,15 @@ package dev.kaenguruu.nomodleftbehind.client;
 import com.formdev.flatlaf.FlatClientProperties;
 import com.formdev.flatlaf.FlatDarkLaf;
 import com.formdev.flatlaf.extras.FlatSVGIcon;
+import com.formdev.flatlaf.ui.FlatLineBorder;
 import net.miginfocom.swing.MigLayout;
 
 import javax.swing.*;
 import javax.swing.border.MatteBorder;
 import java.awt.*;
+import java.util.EnumMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.function.UnaryOperator;
 
 final class StartupWindowStyle {
@@ -20,6 +23,8 @@ final class StartupWindowStyle {
     static final Color TITLEBAR_TEXT = color("#BFC6D0");
     static final Color REQUIRED_COLOR = color("#F08B82");
     static final Color OPTIONAL_COLOR = color("#E3BC65");
+    static final Color CHECKSUM_COLOR = color("#F2C14E");
+    static final Color CHECKSUM_WARNING_BACKGROUND = color("#3A3022");
     static final Color ADDED_COLOR = color("#79C99A");
     static final Color BUTTON_BACKGROUND = color("#30353D");
     static final Color BUTTON_BORDER = color("#454D59");
@@ -29,10 +34,23 @@ final class StartupWindowStyle {
     static final Font SMALL_FONT = BASE_FONT.deriveFont(12f);
     static final Font TITLE_FONT = BASE_FONT.deriveFont(24f);
     static final Font BUTTON_FONT = BASE_FONT.deriveFont(12f);
+    private static final int STATUS_WIDTH = 102;
 
-    private static FlatSVGIcon requiredIcon;
-    private static FlatSVGIcon optionalIcon;
-    private static FlatSVGIcon addedIcon;
+    private static final EnumMap<ModStatus, FlatSVGIcon> STATUS_ICONS = new EnumMap<>(ModStatus.class);
+    private static final Map<ModStatus, StatusPresentation> STATUS_PRESENTATIONS = Map.of(
+        ModStatus.REQUIRED, new StatusPresentation(
+            "/assets/required.svg", "Required", "Required", REQUIRED_COLOR, 0, 0
+        ),
+        ModStatus.CHECKSUM_MISMATCH, new StatusPresentation(
+            "/assets/warning.svg", "Mismatch", "Checksum mismatch", CHECKSUM_COLOR, 2, 1
+        ),
+        ModStatus.OPTIONAL, new StatusPresentation(
+            "/assets/optional.svg", "Optional", "Optional", OPTIONAL_COLOR, 0, 2
+        ),
+        ModStatus.ADDED, new StatusPresentation(
+            "/assets/added.svg", "Added", "Added", ADDED_COLOR, 1, 3
+        )
+    );
 
     private StartupWindowStyle() {
         /* This utility class should not be instantiated */
@@ -83,8 +101,8 @@ final class StartupWindowStyle {
     }
 
     public static JLabel createHeading() {
-        var heading = createLabel("Missing mods", TITLE_FONT, TEXT);
-        setFixedHeight(heading, 30);
+        var heading = createLabel("Mods needing attention", TITLE_FONT, TEXT);
+        setFixedHeight(heading, 34);
 
         return heading;
     }
@@ -109,6 +127,51 @@ final class StartupWindowStyle {
         setFixedHeight(warning, 18);
 
         return warning;
+    }
+
+    public static JPanel createChecksumWarning(int mismatchCount) {
+        var warningSlot = new JPanel(new BorderLayout());
+        warningSlot.setOpaque(false);
+        warningSlot.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
+
+        var warning = new JPanel(new BorderLayout(12, 0));
+        warning.setBackground(CHECKSUM_WARNING_BACKGROUND);
+        warning.setBorder(new FlatLineBorder(new Insets(8, 12, 8, 12), CHECKSUM_COLOR, 1f, 6));
+        warningSlot.add(warning, BorderLayout.CENTER);
+        setFixedHeight(warningSlot, 92);
+        updateChecksumWarning(warningSlot, mismatchCount);
+        return warningSlot;
+    }
+
+    public static void updateChecksumWarning(JPanel warningSlot, int mismatchCount) {
+        var warning = (JPanel) warningSlot.getComponent(0);
+        var copy = checksumWarningCopy(mismatchCount);
+        warning.removeAll();
+
+        var icon = new JLabel(getStatusIcon(ModStatus.CHECKSUM_MISMATCH));
+        icon.getAccessibleContext().setAccessibleName("Checksum warning");
+        warning.add(icon, BorderLayout.WEST);
+
+        var message = new JPanel(new MigLayout(
+            "insets 0, fillx, wrap 1, gap 0",
+            "[grow, fill]"
+        ));
+        message.setOpaque(false);
+
+        var heading = createLabel("Warning", BASE_FONT.deriveFont(Font.BOLD, 15f), CHECKSUM_COLOR);
+        message.add(heading, "growx");
+
+        var explanation = createLabel(copy.explanation(), BASE_FONT.deriveFont(Font.BOLD), TEXT);
+        message.add(explanation, "growx, gaptop 2");
+
+        var action = createLabel(copy.action(), BASE_FONT.deriveFont(Font.BOLD), TEXT);
+        message.add(action, "growx, gaptop 2");
+        warning.add(message, BorderLayout.CENTER);
+
+        setFixedHeight(warning, 80);
+        warningSlot.setVisible(mismatchCount > 0);
+        warningSlot.revalidate();
+        warningSlot.repaint();
     }
 
     public static JPanel createSummarySlot(JLabel summary) {
@@ -226,58 +289,63 @@ final class StartupWindowStyle {
         return row;
     }
 
-    public static JPanel createRequirementStatus(boolean optional) {
-        var requirementColor = optional ? OPTIONAL_COLOR : REQUIRED_COLOR;
+    public static JPanel createStatus(ModStatus statusType) {
+        var presentation = presentationFor(statusType);
         var status = new JPanel(new FlowLayout(FlowLayout.LEFT, 7, 0));
         status.setOpaque(false);
 
-        var requirementIcon = getRequirementIcon(optional, requirementColor);
-
-        var requirementIconLabel = new JLabel(requirementIcon);
-        requirementIconLabel.getAccessibleContext().setAccessibleName(optional ? "Optional" : "Required");
-        status.add(requirementIconLabel);
-
-        var requirement = createLabel(
-            optional ? "Optional" : "Required",
-            SMALL_FONT,
-            requirementColor
-        );
-        status.add(requirement);
-        setFixedWidth(status, 102);
+        status.add(createStatusLabel(statusType, presentation));
+        setFixedWidth(status, STATUS_WIDTH);
 
         return status;
     }
 
-    public static void markRequirementAdded(JPanel status) {
-        status.removeAll();
+    public static void setStatus(JPanel statusPanel, ModStatus statusType) {
+        var presentation = presentationFor(statusType);
+        statusPanel.removeAll();
 
-        var addedIconLabel = new JLabel(getAddedIcon());
-        addedIconLabel.getAccessibleContext().setAccessibleName("Added");
-        status.add(addedIconLabel);
-        status.add(createLabel("Added", SMALL_FONT, ADDED_COLOR));
-        status.revalidate();
-        status.repaint();
+        statusPanel.add(createStatusLabel(statusType, presentation));
+        statusPanel.revalidate();
+        statusPanel.repaint();
     }
 
-    private static FlatSVGIcon getRequirementIcon(boolean optional, Color requirementColor) {
-        if (optional) {
-            if (optionalIcon == null) {
-                optionalIcon = createRequirementIcon("/assets/optional.svg", requirementColor);
+    private static JLabel createStatusLabel(ModStatus statusType, StatusPresentation presentation) {
+        var statusLabel = new JLabel(presentation.label(), getStatusIcon(statusType), SwingConstants.LEFT);
+        statusLabel.setFont(SMALL_FONT);
+        statusLabel.setForeground(presentation.color());
+        statusLabel.setIconTextGap(7);
+        statusLabel.getAccessibleContext().setAccessibleName(presentation.accessibleName());
+        return statusLabel;
+    }
+
+    private static FlatSVGIcon getStatusIcon(ModStatus statusType) {
+        return STATUS_ICONS.computeIfAbsent(
+            statusType,
+            value -> {
+                var presentation = presentationFor(value);
+                return createRequirementIcon(presentation.iconPath(), presentation.color());
             }
-            return optionalIcon;
-        }
-
-        if (requiredIcon == null) {
-            requiredIcon = createRequirementIcon("/assets/required.svg", requirementColor);
-        }
-        return requiredIcon;
+        );
     }
 
-    private static FlatSVGIcon getAddedIcon() {
-        if (addedIcon == null) {
-            addedIcon = createRequirementIcon("/assets/added.svg", ADDED_COLOR);
+    static int statusSortOrder(ModStatus statusType) {
+        return presentationFor(statusType).sortOrder();
+    }
+
+    static boolean canReplaceStatus(ModStatus currentStatus, ModStatus replacementStatus) {
+        if (currentStatus == ModStatus.CHECKSUM_MISMATCH && replacementStatus == ModStatus.ADDED) {
+            return true;
         }
-        return addedIcon;
+
+        return presentationFor(replacementStatus).priority() >= presentationFor(currentStatus).priority();
+    }
+
+    private static StatusPresentation presentationFor(ModStatus statusType) {
+        var presentation = STATUS_PRESENTATIONS.get(statusType);
+        if (presentation == null) {
+            throw new IllegalStateException("Missing startup window status presentation: " + statusType);
+        }
+        return presentation;
     }
 
     private static FlatSVGIcon createRequirementIcon(String resourcePath, Color color) {
@@ -439,5 +507,42 @@ final class StartupWindowStyle {
 
     private static String toHex(Color color) {
         return String.format(Locale.ROOT, "#%02X%02X%02X", color.getRed(), color.getGreen(), color.getBlue());
+    }
+
+    private static ChecksumWarningCopy checksumWarningCopy(int mismatchCount) {
+        if (mismatchCount == 1) {
+            return new ChecksumWarningCopy(
+                "One of the files does not match the trusted version.",
+                "It may have been tampered with or replaced. Review it before continuing."
+            );
+        }
+        return new ChecksumWarningCopy(
+            String.format(
+                Locale.ROOT,
+                "%d of the files do not match their trusted versions.",
+                mismatchCount
+            ),
+            "They may have been tampered with or replaced. Review them before continuing."
+        );
+    }
+
+    enum ModStatus {
+        REQUIRED,
+        CHECKSUM_MISMATCH,
+        OPTIONAL,
+        ADDED
+    }
+
+    private record StatusPresentation(
+        String iconPath,
+        String label,
+        String accessibleName,
+        Color color,
+        int priority,
+        int sortOrder
+    ) {
+    }
+
+    private record ChecksumWarningCopy(String explanation, String action) {
     }
 }

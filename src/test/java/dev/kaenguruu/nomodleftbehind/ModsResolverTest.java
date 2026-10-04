@@ -13,10 +13,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
-class MissingModsResolverTest {
+class ModsResolverTest {
     @TempDir
     Path gameDirectory;
 
@@ -27,7 +26,7 @@ class MissingModsResolverTest {
 
     @Test
     void returnsNoMissingModsForAnEmptyConfiguration() throws IOException {
-        assertTrue(MissingModsResolver.detectMissingMods(List.of()).isEmpty());
+        assertTrue(ModsResolver.resolveMods(List.of()).isEmpty());
     }
 
     @Test
@@ -41,24 +40,52 @@ class MissingModsResolverTest {
         Files.createDirectories(modsDirectory.resolve("missing-1.jar"));
         Files.writeString(modsDirectory.resolve("readme.txt"), "not a mod");
 
-        assertEquals(List.of(missing), MissingModsResolver.detectMissingMods(List.of(present, missing)));
+        var resolvedModsResult = ModsResolver.resolveMods(List.of(present, missing));
+        assertEquals(2, resolvedModsResult.size());
+        assertEquals(ModResolutionResult.ModResolutionStatus.PRESENT, resolvedModsResult.getFirst().status());
+        assertNull(resolvedModsResult.getFirst().installedHash());
+        assertEquals(ModResolutionResult.ModResolutionStatus.MISSING, resolvedModsResult.getLast().status());
+    }
+
+    @Test
+    void returnsPresentWhenTheConfiguredHashMatches() throws IOException {
+        var mod = new DownloadableModConfiguration(
+            "Hash Mod",
+            "https://modrinth.com/hash-mod.jar",
+            "hash-1\\.jar",
+            "e55cffc81a5ad8cfe85239d944a3ae9513645a9eed79bc884f51b80b2760fc46",
+            false
+        );
+        validatePatterns(mod);
+
+        var modFile = FMLPaths.MODSDIR.get().resolve("hash-1.jar");
+        Files.writeString(modFile, "mod");
+
+        var result = ModsResolver.resolveMods(List.of(mod)).getFirst();
+
+        assertEquals(ModResolutionResult.ModResolutionStatus.PRESENT, result.status());
+        assertEquals(
+            "e55cffc81a5ad8cfe85239d944a3ae9513645a9eed79bc884f51b80b2760fc46",
+            result.installedHash()
+        );
     }
 
     @Test
     void returnsAllModsWhenTheModsDirectoryHasNoFiles() throws IOException {
         var required = mod("required-.*\\.jar", "Required Mod");
         var optional = new DownloadableModConfiguration(
+            "Optional Mod",
             "https://modrinth.com/optional.jar",
             "optional-.*\\.jar",
-            "Optional Mod",
+            null,
             true
         );
         validatePatterns(required, optional);
 
-        assertEquals(
-            List.of(required, optional),
-            MissingModsResolver.detectMissingMods(List.of(required, optional))
-        );
+        var resolvedModsResult = ModsResolver.resolveMods(List.of(required, optional));
+        assertEquals(2, resolvedModsResult.size());
+        assertEquals(ModResolutionResult.ModResolutionStatus.MISSING, resolvedModsResult.getFirst().status());
+        assertEquals(ModResolutionResult.ModResolutionStatus.MISSING, resolvedModsResult.getLast().status());
     }
 
     @Test
@@ -69,18 +96,42 @@ class MissingModsResolverTest {
 
         assertEquals(
             List.of(matching),
-            MissingModsResolver.findModsMatchingFileName(
+            ModsResolver.findModsMatchingFileName(
                 List.of(matching, notMatching),
                 "matching-1.jar"
             )
         );
     }
 
+    @Test
+    void includesTheActualHashWhenAConfiguredHashDoesNotMatch() throws IOException {
+        var mod = new DownloadableModConfiguration(
+            "Hash Mod",
+            "https://modrinth.com/hash-mod.jar",
+            "hash-1\\.jar",
+            "not-the-installed-file-hash",
+            false
+        );
+        validatePatterns(mod);
+
+        var modFile = FMLPaths.MODSDIR.get().resolve("hash-1.jar");
+        Files.writeString(modFile, "mod");
+
+        var result = ModsResolver.resolveMods(List.of(mod)).getFirst();
+
+        assertEquals(ModResolutionResult.ModResolutionStatus.HASH_MISMATCH, result.status());
+        assertEquals(
+            "e55cffc81a5ad8cfe85239d944a3ae9513645a9eed79bc884f51b80b2760fc46",
+            result.installedHash()
+        );
+    }
+
     private static DownloadableModConfiguration mod(String filePattern, String name) {
         return new DownloadableModConfiguration(
+            name,
             "https://modrinth.com/" + name.toLowerCase().replace(' ', '-') + ".jar",
             filePattern,
-            name,
+            null,
             false
         );
     }

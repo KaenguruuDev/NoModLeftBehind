@@ -1,7 +1,7 @@
 package dev.kaenguruu.nomodleftbehind;
 
 import com.mojang.logging.LogUtils;
-import dev.kaenguruu.nomodleftbehind.configuration.ConfigurationLoader;
+import dev.kaenguruu.nomodleftbehind.configuration.ConfigurationManager;
 import dev.kaenguruu.nomodleftbehind.configuration.ConfigurationValidator;
 import dev.kaenguruu.nomodleftbehind.startup.ClientStartupCoordinator;
 import dev.kaenguruu.nomodleftbehind.startup.ServerStartupCoordinator;
@@ -25,7 +25,7 @@ public final class NoModLeftBehind {
             System.setProperty("java.awt.headless", "false");
         }
 
-        var config = ConfigurationLoader.tryLoadConfiguration();
+        var config = ConfigurationManager.tryLoadConfiguration();
         if (config == null) {
             LOGGER.error("No configuration could be loaded. Aborting");
             abortStartup();
@@ -45,6 +45,8 @@ public final class NoModLeftBehind {
             abortStartup();
             return;
         }
+
+        ConfigurationManager.trySaveChecksumsForConfiguration(config);
 
         StartupDecision decision;
 
