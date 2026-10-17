@@ -94,7 +94,10 @@ tasks.jar {
     from(earlyServiceDependencies.files.map { dependency -> zipTree(dependency) }) {
         exclude("META-INF/services/**")
         exclude("META-INF/*.SF", "META-INF/*.RSA", "META-INF/*.DSA")
-        exclude("module-info.class")
+        exclude("module-info.class", "META-INF/**/module-info.class")
+        // NeoForge provides Gson as its own named module. Embedding Gson here
+        // would make this mod JAR contain the same package as that module.
+        exclude("com/google/gson/**")
     }
 }
 
