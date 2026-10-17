@@ -28,6 +28,7 @@ import java.util.function.UnaryOperator;
 
 public final class StartupWindow {
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final int MINIMUM_WINDOW_WIDTH = 672;
 
     public void show(
         List<ModResolutionResult> unresolvedMods,
@@ -98,7 +99,8 @@ public final class StartupWindow {
         window.setResizable(false);
         window.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         window.setContentPane(windowParts.root());
-        window.setSize(new Dimension(736, 690));
+        window.pack();
+        fitWindowToScreen(window, windowParts);
         window.setLocationRelativeTo(null);
         var watcher = startModsDirectoryWatcher(windowParts.modListState());
         window.addWindowListener(new WindowAdapter() {
@@ -121,6 +123,38 @@ public final class StartupWindow {
         }
 
         return window;
+    }
+
+    private static void fitWindowToScreen(JFrame window, WindowParts windowParts) {
+        var screenBounds = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
+        var packedSize = window.getSize();
+        var width = Math.clamp(packedSize.width, MINIMUM_WINDOW_WIDTH, screenBounds.width);
+        var height = packedSize.height;
+        var content = (JPanel) windowParts.root().getComponent(1);
+        var footer = windowParts.footer();
+
+        if (width < packedSize.width) {
+            var contentInsets = content.getInsets();
+            var rootInsets = windowParts.root().getInsets();
+            var footerWidth = width
+                - rootInsets.left - rootInsets.right
+                - contentInsets.left - contentInsets.right;
+            footer.setResponsiveWidth(footerWidth);
+            height = Math.min(
+                screenBounds.height,
+                height + footer.preferredHeightForWidth(footerWidth) - footer.horizontalPreferredHeight()
+            );
+        }
+
+        if (height > screenBounds.height) {
+            var scrollPane = (JScrollPane) content.getComponent(5);
+            var heightToReclaim = height - screenBounds.height;
+            var listHeight = scrollPane.getPreferredSize().height;
+            StartupWindowStyle.setFixedHeight(scrollPane, Math.max(0, listHeight - heightToReclaim));
+            height = screenBounds.height;
+        }
+
+        window.setSize(Math.max(1, width), Math.max(1, height));
     }
 
     private static ModsDirectoryWatcher startModsDirectoryWatcher(ModListState modListState) {
@@ -159,7 +193,13 @@ public final class StartupWindow {
         var titlebar = StartupWindowStyle.createTitlebar(closeButton);
         var root = StartupWindowStyle.createRoot(titlebar, contentParts.content());
 
-        return new WindowParts(root, titlebar, closeButton, contentParts.modListState());
+        return new WindowParts(
+            root,
+            titlebar,
+            closeButton,
+            contentParts.footer(),
+            contentParts.modListState()
+        );
     }
 
     private ContentParts createContent(
@@ -202,9 +242,10 @@ public final class StartupWindow {
             );
             content.add(StartupWindowStyle.createPreferenceSlot(optionalPreference));
         }
-        content.add(createFooter(sortedMissingMods));
+        var footer = createFooter(sortedMissingMods);
+        content.add(footer);
 
-        return new ContentParts(content, modListParts.modListState());
+        return new ContentParts(content, footer, modListParts.modListState());
     }
 
     private ModListParts createModListScrollPane(
@@ -236,7 +277,7 @@ public final class StartupWindow {
         return new ModListParts(StartupWindowStyle.createModListScrollPane(modList), modListState);
     }
 
-    private JPanel createFooter(
+    private StartupWindowStyle.ResponsiveFooter createFooter(
         List<ModResolutionResult> sortedMissingMods
     ) {
         var footer = StartupWindowStyle.createFooter();
@@ -295,7 +336,6 @@ public final class StartupWindow {
         DownloadableModConfiguration mod
     ) {
         var download = StartupWindowStyle.createButton("Download", false);
-        StartupWindowStyle.setFixedWidth(download, 88);
         StartupWindowStyle.setFixedHeight(download, 34);
         download.addActionListener(event -> openUrl(mod.url()));
 
@@ -351,7 +391,6 @@ public final class StartupWindow {
         Consumer<Component> failureHandler
     ) {
         var dontShowAgain = StartupWindowStyle.createQuietButton(text);
-        StartupWindowStyle.setFixedWidth(dontShowAgain, 122);
         StartupWindowStyle.setFixedHeight(dontShowAgain, 34);
         dontShowAgain.addActionListener(event -> {
             if (dontShowAgainHandler.test(mod)) {
@@ -516,11 +555,16 @@ public final class StartupWindow {
         JPanel root,
         JPanel titlebar,
         JButton closeButton,
+        StartupWindowStyle.ResponsiveFooter footer,
         ModListState modListState
     ) {
     }
 
-    private record ContentParts(JPanel content, ModListState modListState) {
+    private record ContentParts(
+        JPanel content,
+        StartupWindowStyle.ResponsiveFooter footer,
+        ModListState modListState
+    ) {
     }
 
     private record ModListParts(JScrollPane scrollPane, ModListState modListState) {

@@ -111,6 +111,43 @@ class StartupWindowComponentTest {
     }
 
     @Test
+    void footerUsesMeasuredButtonWidthsAndStacksWhenSpaceRunsOut() throws Exception {
+        var footer = onEdt(() -> {
+            var createdFooter = StartupWindowStyle.createFooter();
+            var openModsDirectory = StartupWindowStyle.createButton("Open mods folder", false);
+            StartupWindowStyle.setFixedHeight(openModsDirectory, 34);
+            var downloadAll = StartupWindowStyle.createButton("Download all", true);
+            StartupWindowStyle.setFixedHeight(downloadAll, 34);
+            createdFooter.add(openModsDirectory);
+            createdFooter.add(downloadAll);
+            return createdFooter;
+        });
+
+        onEdt(() -> {
+            var preferredSize = footer.getPreferredSize();
+            footer.setSize(preferredSize);
+            footer.doLayout();
+
+            var openModsDirectory = (JButton) footer.getComponent(0);
+            var downloadAll = (JButton) footer.getComponent(1);
+            assertTrue(openModsDirectory.getWidth() >= openModsDirectory.getPreferredSize().width);
+            assertTrue(downloadAll.getWidth() >= downloadAll.getPreferredSize().width);
+
+            var narrowWidth = Math.max(
+                openModsDirectory.getPreferredSize().width,
+                downloadAll.getPreferredSize().width
+            );
+            footer.setResponsiveWidth(narrowWidth);
+            footer.setSize(narrowWidth, footer.preferredHeightForWidth(narrowWidth));
+            footer.doLayout();
+
+            assertEquals(narrowWidth, openModsDirectory.getWidth());
+            assertEquals(narrowWidth, downloadAll.getWidth());
+            assertTrue(downloadAll.getY() > openModsDirectory.getY());
+        });
+    }
+
+    @Test
     void windowOmitsOptionalPreferenceWhenNoOptionalModsRemain() throws Exception {
         var required = resolution(
             "Required Mod",

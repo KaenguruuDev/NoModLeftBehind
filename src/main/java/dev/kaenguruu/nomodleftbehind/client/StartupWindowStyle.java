@@ -10,6 +10,7 @@ import javax.swing.*;
 import javax.swing.border.MatteBorder;
 import java.awt.*;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -35,8 +36,6 @@ final class StartupWindowStyle {
     static final Font SMALL_FONT = BASE_FONT.deriveFont(12f);
     static final Font TITLE_FONT = BASE_FONT.deriveFont(24f);
     static final Font BUTTON_FONT = BASE_FONT.deriveFont(12f);
-    private static final int STATUS_WIDTH = 102;
-
     private static final EnumMap<ModStatus, FlatSVGIcon> STATUS_ICONS = new EnumMap<>(ModStatus.class);
     private static final Map<ModStatus, StatusPresentation> STATUS_PRESENTATIONS = Map.of(
         ModStatus.REQUIRED, new StatusPresentation(
@@ -90,6 +89,7 @@ final class StartupWindowStyle {
         var label = new JLabel(text);
         label.setFont(font);
         label.setForeground(foreground);
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         return label;
     }
@@ -98,20 +98,22 @@ final class StartupWindowStyle {
         var modList = new JPanel();
         modList.setLayout(new javax.swing.BoxLayout(modList, javax.swing.BoxLayout.Y_AXIS));
         modList.setBackground(SURFACE);
+        setFullWidth(modList);
 
         return modList;
     }
 
     public static JScrollPane createModListScrollPane(JPanel modList) {
         var scrollPane = new JScrollPane(modList);
-        scrollPane.setPreferredSize(new Dimension(0, 302));
-        scrollPane.setMinimumSize(new Dimension(0, 302));
         scrollPane.setBorder(BorderFactory.createLineBorder(BORDER));
         scrollPane.setBackground(SURFACE);
         scrollPane.getViewport().setBackground(SURFACE);
         scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.getVerticalScrollBar().setUnitIncrement(24);
         setFixedHeight(scrollPane, 302);
+        setFullWidth(scrollPane);
+        var listPreferredWidth = modList.getPreferredSize().width;
+        scrollPane.setPreferredSize(new Dimension(listPreferredWidth, scrollPane.getPreferredSize().height));
 
         return scrollPane;
     }
@@ -158,6 +160,7 @@ final class StartupWindowStyle {
         var warningSlot = new JPanel(new BorderLayout());
         warningSlot.setOpaque(false);
         warningSlot.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
+        setFullWidth(warningSlot);
 
         var warning = new JPanel(new BorderLayout(12, 0));
         warning.setBackground(CHECKSUM_WARNING_BACKGROUND);
@@ -203,6 +206,7 @@ final class StartupWindowStyle {
         var summarySlot = new JPanel(new BorderLayout());
         summarySlot.setOpaque(false);
         summarySlot.setBorder(BorderFactory.createEmptyBorder(18, 0, 10, 0));
+        setFullWidth(summarySlot);
         summarySlot.add(summary, BorderLayout.CENTER);
         setFixedHeight(summarySlot, 45);
 
@@ -250,20 +254,17 @@ final class StartupWindowStyle {
         var preferenceSlot = new JPanel(new BorderLayout());
         preferenceSlot.setOpaque(false);
         preferenceSlot.setBorder(BorderFactory.createEmptyBorder(18, 0, 22, 0));
+        setFullWidth(preferenceSlot);
         preferenceSlot.add(preference, BorderLayout.CENTER);
         setFixedHeight(preferenceSlot, 56);
 
         return preferenceSlot;
     }
 
-    public static JPanel createFooter() {
-        var footer = new JPanel(new MigLayout(
-            "insets 0, fillx",
-            "[pref][grow, fill]",
-            "[34!]"
-        ));
+    public static ResponsiveFooter createFooter() {
+        var footer = new ResponsiveFooter();
         footer.setOpaque(false);
-        setFixedHeight(footer, 34);
+        setFullWidth(footer);
 
         return footer;
     }
@@ -283,7 +284,8 @@ final class StartupWindowStyle {
 
         var closeSlot = new JPanel(new GridBagLayout());
         closeSlot.setOpaque(false);
-        closeSlot.setPreferredSize(new Dimension(30, 38));
+        var closeSize = closeButton.getPreferredSize();
+        closeSlot.setPreferredSize(new Dimension(closeSize.width, closeSize.height + 8));
         closeSlot.add(closeButton);
 
         titlebar.add(closeSlot, BorderLayout.EAST);
@@ -321,6 +323,7 @@ final class StartupWindowStyle {
     public static JPanel createModRow() {
         var row = new JPanel(new GridBagLayout());
         row.setBackground(SURFACE);
+        setFullWidth(row);
         setFixedHeight(row, 74);
 
         return row;
@@ -332,7 +335,8 @@ final class StartupWindowStyle {
         status.setOpaque(false);
 
         status.add(createStatusLabel(statusType, presentation, tooltip));
-        setFixedWidth(status, STATUS_WIDTH);
+        var preferred = status.getPreferredSize();
+        status.setPreferredSize(new Dimension(preferredStatusWidth(), preferred.height));
 
         return status;
     }
@@ -358,6 +362,17 @@ final class StartupWindowStyle {
         statusLabel.setToolTipText(tooltip);
         statusLabel.getAccessibleContext().setAccessibleName(presentation.accessibleName());
         return statusLabel;
+    }
+
+    private static int preferredStatusWidth() {
+        var width = 0;
+        for (var statusType : ModStatus.values()) {
+            var presentation = presentationFor(statusType);
+            var candidate = new JPanel(new FlowLayout(FlowLayout.LEFT, 7, 0));
+            candidate.add(createStatusLabel(statusType, presentation, null));
+            width = Math.max(width, candidate.getPreferredSize().width);
+        }
+        return width;
     }
 
     static String statusTooltip(ModStatus statusType, String fileName) {
@@ -412,7 +427,9 @@ final class StartupWindowStyle {
     public static JPanel createEmptyActions() {
         var emptyActions = new JPanel();
         emptyActions.setOpaque(false);
-        setFixedWidth(emptyActions, 122);
+        var dismissButton = createQuietButton("Don't show again");
+        var preferredDismissSize = dismissButton.getPreferredSize();
+        emptyActions.setPreferredSize(new Dimension(preferredDismissSize.width, preferredDismissSize.height));
 
         return emptyActions;
     }
@@ -444,8 +461,6 @@ final class StartupWindowStyle {
         button.setContentAreaFilled(false);
         button.setToolTipText("Close");
         button.getAccessibleContext().setAccessibleName("Close");
-        setFixedWidth(button, 30);
-        setFixedHeight(button, 30);
         applyButtonStyle(button, SURFACE, SURFACE, SURFACE, SURFACE, SURFACE, SURFACE);
 
         return button;
@@ -508,14 +523,10 @@ final class StartupWindowStyle {
         component.setMaximumSize(new Dimension(maximum.width, height));
     }
 
-    public static void setFixedWidth(JComponent component, int width) {
-        var minimum = component.getMinimumSize();
-        var preferred = component.getPreferredSize();
+    private static void setFullWidth(JComponent component) {
         var maximum = component.getMaximumSize();
-
-        component.setMinimumSize(new Dimension(width, minimum.height));
-        component.setPreferredSize(new Dimension(width, preferred.height));
-        component.setMaximumSize(new Dimension(width, maximum.height));
+        component.setAlignmentX(Component.LEFT_ALIGNMENT);
+        component.setMaximumSize(new Dimension(Integer.MAX_VALUE, maximum.height));
     }
 
     private static GridBagConstraints rowConstraints(int column, int fill, Insets insets) {
@@ -557,6 +568,235 @@ final class StartupWindowStyle {
 
     private static String toHex(Color color) {
         return String.format(Locale.ROOT, "#%02X%02X%02X", color.getRed(), color.getGreen(), color.getBlue());
+    }
+
+    static final class ResponsiveFooter extends JPanel {
+        private static final int GAP = 12;
+        private int responsiveWidth;
+
+        private ResponsiveFooter() {
+            super(new ResponsiveFooterLayout(GAP));
+        }
+
+        void setResponsiveWidth(int width) {
+            if (responsiveWidth == width) {
+                return;
+            }
+
+            responsiveWidth = Math.max(0, width);
+            revalidate();
+        }
+
+        int horizontalPreferredHeight() {
+            return layoutManager().horizontalPreferredHeight(this);
+        }
+
+        int preferredHeightForWidth(int width) {
+            return layoutManager().preferredHeightForWidth(this, width);
+        }
+
+        private ResponsiveFooterLayout layoutManager() {
+            return (ResponsiveFooterLayout) getLayout();
+        }
+
+        @Override
+        public Dimension getPreferredSize() {
+            var preferred = super.getPreferredSize();
+            if (responsiveWidth <= 0) {
+                return preferred;
+            }
+
+            return new Dimension(preferred.width, preferredHeightForWidth(responsiveWidth));
+        }
+    }
+
+    private static final class ResponsiveFooterLayout implements LayoutManager2 {
+        private final int gap;
+
+        private ResponsiveFooterLayout(int gap) {
+            this.gap = gap;
+        }
+
+        @Override
+        public void addLayoutComponent(Component component, Object constraints) {
+            // Footer buttons are laid out by their measured preferred sizes.
+        }
+
+        @Override
+        public void addLayoutComponent(String name, Component component) {
+            // Footer buttons are laid out by their measured preferred sizes.
+        }
+
+        @Override
+        public void removeLayoutComponent(Component component) {
+        }
+
+        @Override
+        public Dimension preferredLayoutSize(Container parent) {
+            return sizeForHorizontalLayout(parent);
+        }
+
+        @Override
+        public Dimension minimumLayoutSize(Container parent) {
+            var insets = parent.getInsets();
+            var minimumWidth = 0;
+            var minimumHeight = 0;
+            var visibleCount = 0;
+            for (Component component : parent.getComponents()) {
+                if (!component.isVisible()) {
+                    continue;
+                }
+
+                var minimum = component.getMinimumSize();
+                minimumWidth = Math.max(minimumWidth, minimum.width);
+                minimumHeight += minimum.height;
+                visibleCount++;
+            }
+
+            if (visibleCount > 1) {
+                minimumHeight += gap * (visibleCount - 1);
+            }
+
+            return new Dimension(
+                insets.left + insets.right + minimumWidth,
+                insets.top + insets.bottom + minimumHeight
+            );
+        }
+
+        @Override
+        public Dimension maximumLayoutSize(Container target) {
+            return new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE);
+        }
+
+        @Override
+        public void layoutContainer(Container parent) {
+            var insets = parent.getInsets();
+            var width = Math.max(0, parent.getWidth() - insets.left - insets.right);
+            var height = Math.max(0, parent.getHeight() - insets.top - insets.bottom);
+            var visible = visibleComponents(parent);
+
+            if (visible.size() <= 1 || width >= horizontalWidth(parent)) {
+                layoutHorizontal(visible, insets.left, insets.top, width, height);
+            } else {
+                layoutVertical(visible, insets.left, insets.top, width);
+            }
+        }
+
+        @Override
+        public float getLayoutAlignmentX(Container target) {
+            return 0;
+        }
+
+        @Override
+        public float getLayoutAlignmentY(Container target) {
+            return 0;
+        }
+
+        @Override
+        public void invalidateLayout(Container target) {
+        }
+
+        private Dimension sizeForHorizontalLayout(Container parent) {
+            var insets = parent.getInsets();
+            var visible = visibleComponents(parent);
+            var width = 0;
+            var height = 0;
+            for (Component component : visible) {
+                var preferred = component.getPreferredSize();
+                width += preferred.width;
+                height = Math.max(height, preferred.height);
+            }
+            if (visible.size() > 1) {
+                width += gap * (visible.size() - 1);
+            }
+
+            return new Dimension(
+                insets.left + insets.right + width,
+                insets.top + insets.bottom + height
+            );
+        }
+
+        private int horizontalPreferredHeight(Container parent) {
+            return sizeForHorizontalLayout(parent).height;
+        }
+
+        private int preferredHeightForWidth(Container parent, int width) {
+            var insets = parent.getInsets();
+            var availableWidth = Math.max(0, width - insets.left - insets.right);
+            if (availableWidth >= horizontalWidth(parent)) {
+                return horizontalPreferredHeight(parent);
+            }
+
+            var height = 0;
+            var visible = visibleComponents(parent);
+            for (Component component : visible) {
+                height += component.getPreferredSize().height;
+            }
+            if (visible.size() > 1) {
+                height += gap * (visible.size() - 1);
+            }
+            return insets.top + insets.bottom + height;
+        }
+
+        private int horizontalWidth(Container parent) {
+            return sizeForHorizontalLayout(parent).width - parent.getInsets().left - parent.getInsets().right;
+        }
+
+        private void layoutHorizontal(
+            List<Component> visible,
+            int x,
+            int y,
+            int width,
+            int height
+        ) {
+            if (visible.isEmpty()) {
+                return;
+            }
+
+            var first = visible.get(0);
+            var firstSize = first.getPreferredSize();
+            first.setBounds(x, y + Math.max(0, (height - firstSize.height) / 2), firstSize.width, firstSize.height);
+            if (visible.size() == 1) {
+                return;
+            }
+
+            var last = visible.get(visible.size() - 1);
+            var lastSize = last.getPreferredSize();
+            last.setBounds(
+                x + width - lastSize.width,
+                y + Math.max(0, (height - lastSize.height) / 2),
+                lastSize.width,
+                lastSize.height
+            );
+            for (int index = 1; index < visible.size() - 1; index++) {
+                var component = visible.get(index);
+                var size = component.getPreferredSize();
+                component.setBounds(
+                    x + (width - size.width) / 2,
+                    y + Math.max(0, (height - size.height) / 2),
+                    size.width,
+                    size.height
+                );
+            }
+        }
+
+        private void layoutVertical(List<Component> visible, int x, int y, int width) {
+            for (var component : visible) {
+                var preferred = component.getPreferredSize();
+                component.setBounds(x, y, width, preferred.height);
+                y += preferred.height + gap;
+            }
+        }
+
+        private static List<Component> visibleComponents(Container parent) {
+            var visible = new java.util.ArrayList<Component>();
+            for (Component component : parent.getComponents()) {
+                if (component.isVisible()) {
+                    visible.add(component);
+                }
+            }
+            return visible;
+        }
     }
 
     private static ChecksumWarningCopy checksumWarningCopy(int mismatchCount) {
