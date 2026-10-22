@@ -511,44 +511,107 @@ public final class StartupWindow {
     }
 
     private static void openUrl(String url) {
+        final URI uri;
         try {
-            if (!Desktop.isDesktopSupported()) {
-                LOGGER.error("Cannot open download URL because desktop integration is unavailable: {}", url);
-                return;
-            }
-
-            var desktop = Desktop.getDesktop();
-            if (!desktop.isSupported(Desktop.Action.BROWSE)) {
-                LOGGER.error("Cannot open download URL because browser integration is unavailable: {}", url);
-                return;
-            }
-
-            desktop.browse(URI.create(url));
-        } catch (IOException | IllegalArgumentException | HeadlessException exception) {
-            LOGGER.error("Unable to open download URL in the default browser: {}", url, exception);
+            uri = URI.create(url);
+        } catch (IllegalArgumentException exception) {
+            LOGGER.error("Unable to open invalid download URL: {}", url, exception);
+            return;
         }
+
+        if (tryOpenWithDesktop(uri)) {
+            return;
+        }
+        if (tryOpenWithSystemCommand(uri.toString())) {
+            return;
+        }
+
+        LOGGER.error("Unable to open download URL in the default browser: {}", url);
     }
 
     private static void openModsDirectory() {
         var modsDirectory = FMLPaths.MODSDIR.get();
 
         try {
-            if (!Desktop.isDesktopSupported()) {
-                LOGGER.error("Cannot open the mods directory because desktop integration is unavailable: {}", modsDirectory);
+            Files.createDirectories(modsDirectory);
+            if (tryOpenWithDesktop(modsDirectory)) {
                 return;
+            }
+            if (tryOpenWithSystemCommand(modsDirectory.toString())) {
+                return;
+            }
+        } catch (IOException exception) {
+            LOGGER.error("Unable to create the mods directory: {}", modsDirectory, exception);
+        }
+
+        LOGGER.error("Unable to open the mods directory: {}", modsDirectory);
+    }
+
+    private static boolean tryOpenWithDesktop(URI uri) {
+        try {
+            if (!Desktop.isDesktopSupported()) {
+                return false;
+            }
+
+            var desktop = Desktop.getDesktop();
+            if (!desktop.isSupported(Desktop.Action.BROWSE)) {
+                return false;
+            }
+
+            desktop.browse(uri);
+            return true;
+        } catch (IOException | SecurityException | UnsupportedOperationException exception) {
+            LOGGER.debug("Java desktop integration could not open URI: {}", uri, exception);
+            return false;
+        }
+    }
+
+    private static boolean tryOpenWithDesktop(Path path) {
+        try {
+            if (!Desktop.isDesktopSupported()) {
+                return false;
             }
 
             var desktop = Desktop.getDesktop();
             if (!desktop.isSupported(Desktop.Action.OPEN)) {
-                LOGGER.error("Cannot open the mods directory because file-manager integration is unavailable: {}", modsDirectory);
-                return;
+                return false;
             }
 
-            Files.createDirectories(modsDirectory);
-            desktop.open(modsDirectory.toFile());
-        } catch (IOException | IllegalArgumentException | HeadlessException exception) {
-            LOGGER.error("Unable to open the mods directory: {}", modsDirectory, exception);
+            desktop.open(path.toFile());
+            return true;
+        } catch (IOException | SecurityException | UnsupportedOperationException exception) {
+            LOGGER.debug("Java desktop integration could not open path: {}", path, exception);
+            return false;
         }
+    }
+
+    private static boolean tryOpenWithSystemCommand(String target) {
+        var operatingSystem = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        List<List<String>> commands;
+
+        if (operatingSystem.contains("win")) {
+            commands = List.of(List.of("rundll32", "url.dll,FileProtocolHandler", target));
+        } else if (operatingSystem.contains("mac") || operatingSystem.contains("darwin")) {
+            commands = List.of(List.of("open", target));
+        } else {
+            commands = List.of(
+                List.of("xdg-open", target),
+                List.of("gio", "open", target),
+                List.of("kde-open5", target),
+                List.of("gnome-open", target)
+            );
+        }
+
+        for (var command : commands) {
+            try {
+                new ProcessBuilder(command).start();
+                return true;
+            } catch (IOException | SecurityException exception) {
+                LOGGER.debug("Unable to open target with command {}", command, exception);
+            }
+        }
+
+        return false;
     }
 
     record WindowParts(
