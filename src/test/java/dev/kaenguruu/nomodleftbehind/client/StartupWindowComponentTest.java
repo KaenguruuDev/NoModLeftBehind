@@ -115,9 +115,9 @@ class StartupWindowComponentTest {
         var footer = onEdt(() -> {
             var createdFooter = StartupWindowStyle.createFooter();
             var openModsDirectory = StartupWindowStyle.createButton("Open mods folder", false);
-            StartupWindowStyle.setFixedHeight(openModsDirectory, 34);
+            StartupWindowStyle.setAtLeastHeight(openModsDirectory, 34);
             var downloadAll = StartupWindowStyle.createButton("Download all", true);
-            StartupWindowStyle.setFixedHeight(downloadAll, 34);
+            StartupWindowStyle.setAtLeastHeight(downloadAll, 34);
             createdFooter.add(openModsDirectory);
             createdFooter.add(downloadAll);
             return createdFooter;
@@ -145,6 +145,21 @@ class StartupWindowComponentTest {
             assertEquals(narrowWidth, downloadAll.getWidth());
             assertTrue(downloadAll.getY() > openModsDirectory.getY());
         });
+    }
+
+    @Test
+    void fixedHeightsNeverClipHighDpiPreferredSizes() throws Exception {
+        var button = onEdt(() -> StartupWindowStyle.createButton("Download", false));
+        var preferredHeight = onEdt(() -> button.getPreferredSize().height);
+        var preferredWidth = onEdt(() -> button.getPreferredSize().width);
+
+        onEdt(() -> StartupWindowStyle.setAtLeastHeight(button, 1));
+
+        assertTrue(onEdt(() -> button.getPreferredSize().height >= preferredHeight));
+        assertTrue(onEdt(() -> button.getMinimumSize().height >= preferredHeight));
+        assertTrue(onEdt(() -> button.getMaximumSize().height >= preferredHeight));
+        assertTrue(onEdt(() -> button.getPreferredSize().width >= preferredWidth));
+        assertTrue(onEdt(() -> button.getMinimumSize().width >= preferredWidth));
     }
 
     @Test

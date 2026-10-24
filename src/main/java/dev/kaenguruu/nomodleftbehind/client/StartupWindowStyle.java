@@ -4,6 +4,7 @@ import com.formdev.flatlaf.FlatClientProperties;
 import com.formdev.flatlaf.FlatDarkLaf;
 import com.formdev.flatlaf.extras.FlatSVGIcon;
 import com.formdev.flatlaf.ui.FlatLineBorder;
+import com.formdev.flatlaf.util.UIScale;
 import net.miginfocom.swing.MigLayout;
 
 import javax.swing.*;
@@ -32,10 +33,10 @@ final class StartupWindowStyle {
     static final Color BUTTON_BORDER = color("#454D59");
     static final Color ACCENT = color("#6D9EEB");
     static final Color ACCENT_TEXT = color("#14243D");
-    static final Font BASE_FONT = new Font("Segoe UI", Font.PLAIN, 14);
-    static final Font SMALL_FONT = BASE_FONT.deriveFont(12f);
-    static final Font TITLE_FONT = BASE_FONT.deriveFont(24f);
-    static final Font BUTTON_FONT = BASE_FONT.deriveFont(12f);
+    static Font BASE_FONT = new Font("Segoe UI", Font.PLAIN, 14);
+    static Font SMALL_FONT = BASE_FONT.deriveFont(12f);
+    static Font TITLE_FONT = BASE_FONT.deriveFont(24f);
+    static Font BUTTON_FONT = BASE_FONT.deriveFont(12f);
     private static final EnumMap<ModStatus, FlatSVGIcon> STATUS_ICONS = new EnumMap<>(ModStatus.class);
     private static final Map<ModStatus, StatusPresentation> STATUS_PRESENTATIONS = Map.of(
         ModStatus.REQUIRED, new StatusPresentation(
@@ -81,8 +82,46 @@ final class StartupWindowStyle {
     }
 
     public static void installLookAndFeel() {
+        configureHiDpiFallback();
         FlatDarkLaf.setup();
-        UIManager.put("defaultFont", BASE_FONT);
+
+        var userScale = UIScale.getUserScaleFactor();
+        BASE_FONT = scaledFont(Font.PLAIN, 14f, userScale);
+        SMALL_FONT = scaledFont(Font.PLAIN, 12f, userScale);
+        TITLE_FONT = scaledFont(Font.PLAIN, 24f, userScale);
+        BUTTON_FONT = scaledFont(Font.PLAIN, 12f, userScale);
+    }
+
+    private static void configureHiDpiFallback() {
+        if (System.getProperty("flatlaf.uiScale") != null || GraphicsEnvironment.isHeadless()) {
+            return;
+        }
+
+        try {
+            var configuration = GraphicsEnvironment
+                .getLocalGraphicsEnvironment()
+                .getDefaultScreenDevice()
+                .getDefaultConfiguration();
+            var javaScale = Math.max(
+                configuration.getDefaultTransform().getScaleX(),
+                configuration.getDefaultTransform().getScaleY()
+            );
+            var desktopScale = Toolkit.getDefaultToolkit().getScreenResolution() / 96d;
+
+            // Some embedded Java clients expose a 1.0 Java2D transform even
+            // though Windows reports a larger desktop scale. FlatLaf's custom
+            // scale factor fills that gap; when Java already applies the
+            // scale, adding it again would make the UI too large.
+            if (desktopScale > javaScale + 0.01d) {
+                System.setProperty("flatlaf.uiScale", Double.toString(desktopScale / javaScale));
+            }
+        } catch (HeadlessException | AWTError ignored) {
+            // The normal Java2D/FlatLaf scaling path remains available.
+        }
+    }
+
+    private static Font scaledFont(int style, float size, float scale) {
+        return new Font("Segoe UI", style, 1).deriveFont(size * scale);
     }
 
     public static JLabel createLabel(String text, Font font, Color foreground) {
@@ -110,7 +149,7 @@ final class StartupWindowStyle {
         scrollPane.getViewport().setBackground(SURFACE);
         scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.getVerticalScrollBar().setUnitIncrement(24);
-        setFixedHeight(scrollPane, 302);
+        setExactHeight(scrollPane, UIScale.scale(302));
         setFullWidth(scrollPane);
         var listPreferredWidth = modList.getPreferredSize().width;
         scrollPane.setPreferredSize(new Dimension(listPreferredWidth, scrollPane.getPreferredSize().height));
@@ -129,7 +168,7 @@ final class StartupWindowStyle {
 
     public static JLabel createHeading() {
         var heading = createLabel("Mods needing attention", TITLE_FONT, TEXT);
-        setFixedHeight(heading, 34);
+        setAtLeastHeight(heading, 34);
 
         return heading;
     }
@@ -140,7 +179,7 @@ final class StartupWindowStyle {
             BASE_FONT,
             MUTED_TEXT
         );
-        setFixedHeight(intro, 20);
+        setAtLeastHeight(intro, 20);
 
         return intro;
     }
@@ -151,7 +190,7 @@ final class StartupWindowStyle {
             SMALL_FONT,
             OPTIONAL_COLOR
         );
-        setFixedHeight(warning, 18);
+        setAtLeastHeight(warning, 18);
 
         return warning;
     }
@@ -166,7 +205,7 @@ final class StartupWindowStyle {
         warning.setBackground(CHECKSUM_WARNING_BACKGROUND);
         warning.setBorder(new FlatLineBorder(new Insets(8, 12, 8, 12), CHECKSUM_COLOR, 1f, 6));
         warningSlot.add(warning, BorderLayout.CENTER);
-        setFixedHeight(warningSlot, 92);
+        setAtLeastHeight(warningSlot, 92);
         updateChecksumWarning(warningSlot, mismatchCount);
         return warningSlot;
     }
@@ -186,17 +225,25 @@ final class StartupWindowStyle {
         ));
         message.setOpaque(false);
 
-        var heading = createLabel("Warning", BASE_FONT.deriveFont(Font.BOLD, 15f), CHECKSUM_COLOR);
+        var heading = createLabel("Warning", scaledFont(Font.BOLD, 15f, UIScale.getUserScaleFactor()), CHECKSUM_COLOR);
         message.add(heading, "growx");
 
-        var explanation = createLabel(copy.explanation(), BASE_FONT.deriveFont(Font.BOLD), TEXT);
+        var explanation = createLabel(
+            copy.explanation(),
+            scaledFont(Font.BOLD, 14f, UIScale.getUserScaleFactor()),
+            TEXT
+        );
         message.add(explanation, "growx, gaptop 2");
 
-        var action = createLabel(copy.action(), BASE_FONT.deriveFont(Font.BOLD), TEXT);
+        var action = createLabel(
+            copy.action(),
+            scaledFont(Font.BOLD, 14f, UIScale.getUserScaleFactor()),
+            TEXT
+        );
         message.add(action, "growx, gaptop 2");
         warning.add(message, BorderLayout.CENTER);
 
-        setFixedHeight(warning, 80);
+        setAtLeastHeight(warning, 80);
         warningSlot.setVisible(mismatchCount > 0);
         warningSlot.revalidate();
         warningSlot.repaint();
@@ -208,7 +255,7 @@ final class StartupWindowStyle {
         summarySlot.setBorder(BorderFactory.createEmptyBorder(18, 0, 10, 0));
         setFullWidth(summarySlot);
         summarySlot.add(summary, BorderLayout.CENTER);
-        setFixedHeight(summarySlot, 45);
+        setAtLeastHeight(summarySlot, 45);
 
         return summarySlot;
     }
@@ -256,7 +303,7 @@ final class StartupWindowStyle {
         preferenceSlot.setBorder(BorderFactory.createEmptyBorder(18, 0, 22, 0));
         setFullWidth(preferenceSlot);
         preferenceSlot.add(preference, BorderLayout.CENTER);
-        setFixedHeight(preferenceSlot, 56);
+        setAtLeastHeight(preferenceSlot, 56);
 
         return preferenceSlot;
     }
@@ -324,7 +371,7 @@ final class StartupWindowStyle {
         var row = new JPanel(new GridBagLayout());
         row.setBackground(SURFACE);
         setFullWidth(row);
-        setFixedHeight(row, 74);
+        setAtLeastHeight(row, 74);
 
         return row;
     }
@@ -447,6 +494,7 @@ final class StartupWindowStyle {
             primary ? ACCENT : BUTTON_BORDER,
             primary ? ACCENT : BUTTON_BORDER,
             primary ? ACCENT : BUTTON_BORDER);
+        preserveButtonWidth(button);
 
         return button;
     }
@@ -473,8 +521,21 @@ final class StartupWindowStyle {
         button.setMargin(new Insets(8, 0, 8, 0));
         applyButtonStyle(button, SURFACE, BUTTON_BACKGROUND, BUTTON_BACKGROUND,
             SURFACE, BUTTON_BACKGROUND, BUTTON_BACKGROUND);
+        preserveButtonWidth(button);
 
         return button;
+    }
+
+    private static void preserveButtonWidth(JButton button) {
+        var preferred = button.getPreferredSize();
+        var minimum = button.getMinimumSize();
+        var width = Math.max(preferred.width, minimum.width);
+
+        // GridBagLayout may otherwise shrink an action column below the
+        // measured button width when the available logical window width is
+        // reduced by display scaling. Keep the text-bearing control intact.
+        button.setMinimumSize(new Dimension(width, minimum.height));
+        button.setPreferredSize(new Dimension(width, preferred.height));
     }
 
     public static GridBagConstraints identityConstraints() {
@@ -511,16 +572,35 @@ final class StartupWindowStyle {
         }
     }
 
-    public static void setFixedHeight(JComponent component, int height) {
+    static void setAtLeastHeight(JComponent component, int height) {
         var minimum = component.getMinimumSize();
         var preferred = component.getPreferredSize();
         var maximum = component.getMaximumSize();
-        var fixed = new Dimension(preferred.width, height);
+        // The requested height is expressed in Swing's logical coordinates. On a
+        // HiDPI display FlatLaf may report a larger preferred/minimum height
+        // for a control than it does at 100% scaling, so never shrink below
+        // those measured values.
+        var actualHeight = Math.max(
+            UIScale.scale(height),
+            Math.max(minimum.height, preferred.height)
+        );
+        var sized = new Dimension(preferred.width, actualHeight);
 
         component.setAlignmentX(Component.LEFT_ALIGNMENT);
-        component.setMinimumSize(new Dimension(minimum.width, height));
-        component.setPreferredSize(fixed);
-        component.setMaximumSize(new Dimension(maximum.width, height));
+        component.setMinimumSize(new Dimension(minimum.width, actualHeight));
+        component.setPreferredSize(sized);
+        component.setMaximumSize(new Dimension(maximum.width, actualHeight));
+    }
+
+    static void setExactHeight(JComponent component, int height) {
+        var minimum = component.getMinimumSize();
+        var actualHeight = Math.max(height, minimum.height);
+        var sized = new Dimension(component.getPreferredSize().width, actualHeight);
+
+        component.setAlignmentX(Component.LEFT_ALIGNMENT);
+        component.setMinimumSize(new Dimension(minimum.width, actualHeight));
+        component.setPreferredSize(sized);
+        component.setMaximumSize(new Dimension(component.getMaximumSize().width, actualHeight));
     }
 
     private static void setFullWidth(JComponent component) {

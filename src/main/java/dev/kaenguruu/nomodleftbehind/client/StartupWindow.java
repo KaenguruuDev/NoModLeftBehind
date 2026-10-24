@@ -1,5 +1,6 @@
 package dev.kaenguruu.nomodleftbehind.client;
 
+import com.formdev.flatlaf.util.UIScale;
 import com.mojang.logging.LogUtils;
 import dev.kaenguruu.nomodleftbehind.HashUtil;
 import dev.kaenguruu.nomodleftbehind.ModResolutionResult;
@@ -128,7 +129,8 @@ public final class StartupWindow {
     private static void fitWindowToScreen(JFrame window, WindowParts windowParts) {
         var screenBounds = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
         var packedSize = window.getSize();
-        var width = Math.clamp(packedSize.width, MINIMUM_WINDOW_WIDTH, screenBounds.width);
+        var minimumWidth = UIScale.scale(MINIMUM_WINDOW_WIDTH);
+        var width = Math.clamp(packedSize.width, minimumWidth, screenBounds.width);
         var height = packedSize.height;
         var content = (JPanel) windowParts.root().getComponent(1);
         var footer = windowParts.footer();
@@ -150,7 +152,7 @@ public final class StartupWindow {
             var scrollPane = (JScrollPane) content.getComponent(5);
             var heightToReclaim = height - screenBounds.height;
             var listHeight = scrollPane.getPreferredSize().height;
-            StartupWindowStyle.setFixedHeight(scrollPane, Math.max(0, listHeight - heightToReclaim));
+            StartupWindowStyle.setExactHeight(scrollPane, Math.max(0, listHeight - heightToReclaim));
             height = screenBounds.height;
         }
 
@@ -283,11 +285,11 @@ public final class StartupWindow {
         var footer = StartupWindowStyle.createFooter();
 
         var openModsDirectory = StartupWindowStyle.createButton("Open mods folder", false);
-        StartupWindowStyle.setFixedHeight(openModsDirectory, 34);
+        StartupWindowStyle.setAtLeastHeight(openModsDirectory, 34);
         openModsDirectory.addActionListener(event -> openModsDirectory());
 
         var downloadAll = StartupWindowStyle.createButton("Download all", true);
-        StartupWindowStyle.setFixedHeight(downloadAll, 34);
+        StartupWindowStyle.setAtLeastHeight(downloadAll, 34);
         downloadAll.addActionListener(event -> sortedMissingMods.forEach(mod -> openUrl(mod.mod().url())));
 
         footer.add(openModsDirectory, "left, top");
@@ -327,6 +329,7 @@ public final class StartupWindow {
             dontShowChecksumMismatchAgainHandler,
             removeRow
         );
+        StartupWindowStyle.setAtLeastHeight(row, 74);
 
         return new ModRow(row, status);
     }
@@ -336,7 +339,7 @@ public final class StartupWindow {
         DownloadableModConfiguration mod
     ) {
         var download = StartupWindowStyle.createButton("Download", false);
-        StartupWindowStyle.setFixedHeight(download, 34);
+        StartupWindowStyle.setAtLeastHeight(download, 34);
         download.addActionListener(event -> openUrl(mod.url()));
 
         row.add(download, StartupWindowStyle.actionConstraints(2, 12));
@@ -391,7 +394,7 @@ public final class StartupWindow {
         Consumer<Component> failureHandler
     ) {
         var dontShowAgain = StartupWindowStyle.createQuietButton(text);
-        StartupWindowStyle.setFixedHeight(dontShowAgain, 34);
+        StartupWindowStyle.setAtLeastHeight(dontShowAgain, 34);
         dontShowAgain.addActionListener(event -> {
             if (dontShowAgainHandler.test(mod)) {
                 removeRow.run();
