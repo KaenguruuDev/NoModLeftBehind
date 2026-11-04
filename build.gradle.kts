@@ -110,3 +110,28 @@ tasks.test {
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
 }
+
+// Generate NeoForge metadata from the same Gradle properties used for the artifact.
+// The logo is copied separately because logoFile refers to a file at the JAR root.
+tasks.processResources {
+    val metadataProperties = mapOf(
+        "mod_id" to project.property("mod.id"),
+        "mod_name" to project.property("mod.display_name"),
+        "mod_version" to project.property("mod.version"),
+        "mod_license" to project.property("mod.license"),
+        "mod_author" to project.property("mod.author"),
+        "mod_homepage" to project.property("mod.homepage"),
+        "mod_issue_tracker" to project.property("mod.issue_tracker"),
+        "mod_logo" to project.property("mod.logo"),
+        "mod_description" to project.property("mod.description"),
+        "loader_version_range" to project.property("mod.loader_version_range"),
+        "minecraft_version_range" to project.property("mod.minecraft_version_range"),
+        "neo_version" to project.property("neo_version")
+    )
+
+    inputs.properties(metadataProperties)
+    filesMatching("META-INF/neoforge.mods.toml") {
+        expand(metadataProperties)
+    }
+    from(project.file("Logo.png"))
+}
