@@ -1,9 +1,9 @@
 plugins {
     java
+    id("dev.kaenguruu.versioning") version "0.1.1"
     id("net.neoforged.moddev") version "2.0.144"
 }
 
-version = property("mod.version") as String
 group = property("mod.group") as String
 
 base {
@@ -117,7 +117,7 @@ tasks.processResources {
     val metadataProperties = mapOf(
         "mod_id" to project.property("mod.id"),
         "mod_name" to project.property("mod.display_name"),
-        "mod_version" to project.property("mod.version"),
+        "mod_version" to project.version.toString(),
         "mod_license" to project.property("mod.license"),
         "mod_author" to project.property("mod.author"),
         "mod_homepage" to project.property("mod.homepage"),

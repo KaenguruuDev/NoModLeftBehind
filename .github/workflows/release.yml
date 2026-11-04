@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  packages: read
 
 jobs:
   release:
@@ -25,7 +26,10 @@ jobs:
           cache-cleanup: always
 
       - name: Build release JAR
-        run: ./gradlew build --no-daemon
+        env:
+          KAENGURUU_PLUGIN_USER: KaenguruuDev
+          KAENGURUU_PLUGIN_TOKEN: ${{ secrets.KAENGURUU_PLUGIN_TOKEN }}
+        run: ./gradlew clean build --no-daemon
 
       - name: Name release asset
         shell: bash
